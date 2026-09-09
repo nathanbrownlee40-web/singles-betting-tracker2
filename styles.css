@@ -179,3 +179,33 @@ body.view-desktop .dashboard-mini-stats .mini-stat{grid-column:auto}
 .history-month-table .negative{color:#ff6d7d!important;font-weight:800}
 .history-month-empty{padding:12px 0;color:#7f8da8;font-size:12px}
 @media(max-width:500px){.history-month-summary{padding:12px 13px}.history-month-panel[open] #monthlyHistoryBreakdown{padding:0 13px 12px}}
+
+/* v22: sample data test control */
+#sampleDataBtn.sample-loaded{border-color:rgba(255,109,125,.45);color:#ff9aa6}
+
+
+/* v23: true forced Mobile view - emulate the compact phone layout regardless of screen width */
+body.view-mobile{overflow-x:hidden}
+body.view-mobile .topbar,body.view-mobile main,body.view-mobile footer{width:100%;max-width:520px;margin-left:auto;margin-right:auto}
+body.view-mobile .topbar{padding:16px 14px;gap:12px}
+body.view-mobile .topbar h1{font-size:24px}
+body.view-mobile .topbar p{font-size:12px;line-height:1.4}
+body.view-mobile .top-actions{width:100%;display:grid;grid-template-columns:1fr 1fr}
+body.view-mobile .top-actions button,body.view-mobile .view-mode-control select{width:100%}
+body.view-mobile main{padding:14px 10px}
+body.view-mobile .tabs{width:100%;max-width:520px;margin:0 auto;padding:7px 8px}
+body.view-mobile .tabs .tab{padding:9px 10px;font-size:12px}
+body.view-mobile .panel{padding:13px;border-radius:13px}
+body.view-mobile .card{padding:12px}
+body.view-mobile .card strong{font-size:20px}
+body.view-mobile .history-month-table{min-width:680px}
+body.view-mobile .history-month-summary{padding:12px}
+body.view-mobile .history-month-panel[open] #monthlyHistoryBreakdown{padding:0 12px 12px}
+
+/* v23: monthly rows are colour-coded by overall monthly P/L */
+.history-month-table tr.month-positive{background:rgba(35,140,91,.12)}
+.history-month-table tr.month-negative{background:rgba(180,50,70,.12)}
+.history-month-table tr.month-neutral{background:#101a2e}
+.history-month-table tr.month-positive td:first-child{border-left:3px solid rgba(97,214,155,.75)}
+.history-month-table tr.month-negative td:first-child{border-left:3px solid rgba(255,109,125,.75)}
+.history-month-table tr.month-positive td,.history-month-table tr.month-negative td,.history-month-table tr.month-neutral td{border-bottom-color:#26324c}
