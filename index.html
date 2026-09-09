@@ -136,6 +136,13 @@
             <label class="file-button secondary">Import JSON<input id="importJson" type="file" accept=".json"></label>
           </div>
         </div>
+        <div class="history-chart-panel">
+          <div class="panel-head">
+            <div><h3>Profit & Loss</h3><p class="muted">Cumulative P/L from your settled bets. Filters below also update this graph.</p></div>
+          </div>
+          <div class="history-chart-wrap"><canvas id="historyPlChart"></canvas></div>
+          <div id="historyChartEmpty" class="chart-empty hidden">Add or load settled bets to see your P/L line.</div>
+        </div>
         <div class="filters">
           <input id="search" placeholder="Search selection/event/league/market...">
           <select id="filterStatus"><option value="">All statuses</option><option>Win</option><option>Loss</option><option>Void</option><option>Pending</option></select>
@@ -154,6 +161,10 @@
     </section>
 
     <section id="analytics" class="tab-panel">
+      <div class="analytics-hero">
+        <div><span class="eyebrow">BETTING INTELLIGENCE</span><h2>Analytics</h2><p>See exactly which markets, selections, leagues and odds ranges are making or losing money.</p></div>
+        <div class="analytics-hero-badge">Live from your bets</div>
+      </div>
       <div class="analytics-tabs">
         <button class="analytics-tab active" data-analytics="market">Markets</button>
         <button class="analytics-tab" data-analytics="selection">Selections</button>

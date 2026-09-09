@@ -2,6 +2,7 @@ const KEY="singlesBettingTracker.v1";
 let bets=load();
 let charts={};
 const metricModes={market:"roi",selection:"roi",league:"roi",odds:"roi"};
+let historyChart=null;
 
 const $=id=>document.getElementById(id);
 const money=n=>`£${Number(n||0).toFixed(2)}`;
@@ -23,10 +24,24 @@ function fmtDate(v){if(!v)return "";const d=new Date(v);return isNaN(d)?v:d.toLo
 function validBets(){return bets.filter(b=>["Win","Loss","Void"].includes(b.status))}
 function aggregate(field){
  const m={};
- validBets().forEach(b=>{const k=(b[field]||"Unknown").trim()||"Unknown";if(!m[k])m[k]={name:k,bets:0,stake:0,ret:0,pl:0,wins:0};
- const c=calc(b);m[k].bets++;m[k].stake+=c.stake;m[k].ret+=c.ret;m[k].pl+=c.pl;if(b.status==="Win")m[k].wins++});
- return Object.values(m).map(x=>({...x,roi:x.stake?x.pl/x.stake*100:0,win:x.bets?x.wins/x.bets*100:0})).sort((a,b)=>b.pl-a.pl)
+ validBets().forEach(b=>{
+   const k=(b[field]||"Unknown").trim()||"Unknown";
+   if(!m[k])m[k]={name:k,bets:0,stake:0,ret:0,pl:0,wins:0,markets:{},leagues:{}};
+   const c=calc(b);
+   m[k].bets++;m[k].stake+=c.stake;m[k].ret+=c.ret;m[k].pl+=c.pl;
+   if(b.status==="Win")m[k].wins++;
+   if(b.market)m[k].markets[b.market]=(m[k].markets[b.market]||0)+1;
+   if(b.league)m[k].leagues[b.league]=(m[k].leagues[b.league]||0)+1;
+ });
+ return Object.values(m).map(x=>({
+   ...x,
+   roi:x.stake?x.pl/x.stake*100:0,
+   win:x.bets?x.wins/x.bets*100:0,
+   topMarket:Object.entries(x.markets).sort((a,b)=>b[1]-a[1])[0]?.[0]||"",
+   topLeague:Object.entries(x.leagues).sort((a,b)=>b[1]-a[1])[0]?.[0]||""
+ })).sort((a,b)=>b.pl-a.pl);
 }
+
 function totalStats(){
  let stake=0,ret=0,pl=0,wins=0,settled=0,odds=0,oddsN=0;
  bets.forEach(b=>{const c=calc(b);stake+=c.stake;ret+=c.ret;pl+=c.pl;if(b.status!=="Pending"){settled++;if(b.status==="Win")wins++}if(+b.odds){odds+=+b.odds;oddsN++}});
@@ -42,7 +57,7 @@ function render(){
  $("kpiProfit").textContent=money(s.pl);$("kpiProfit").className=s.pl>=0?"positive":"negative";
  $("kpiRoi").textContent=pct(s.roi);$("kpiWin").textContent=pct(s.win);$("kpiOdds").textContent=s.avg.toFixed(2);
  $("kpiStreak").textContent=streak();
- renderHistory();renderDashLists();renderAnalytics();renderCharts();
+ renderHistory();renderHistoryChart();renderDashLists();renderAnalytics();renderCharts();
 }
 function filtered(){
  const q=$("search").value.toLowerCase(), st=$("filterStatus").value, ma=$("filterMarket").value.toLowerCase(), le=$("filterLeague").value.toLowerCase(), from=$("filterFrom").value, to=$("filterTo").value;
@@ -54,7 +69,7 @@ function filtered(){
 function renderHistory(){
  const rows=filtered();
  if(!rows.length){
-   $("historyBody").innerHTML=`<div class="history-empty">No bets yet. Add one or load demo data.</div>`;
+   $("historyBody").innerHTML=`<tr><td colspan="10"><div class="history-empty">No bets yet. Add one or load demo data.</div></td></tr>`;
    return;
  }
 
@@ -164,11 +179,15 @@ function renderAnalytics(){
  $("oddsTable").innerHTML=tableHTML(rows,metricModes.odds);
 
  const s=totalStats();
- $("summary").innerHTML=`<div class="summary-grid">
- <div class="summary-box"><span>Best market</span><strong>${esc(markets[0]?.name||"—")}</strong><small>${markets[0]?money(markets[0].pl)+" P/L • "+pct(markets[0].roi)+" ROI":" "}</small></div>
- <div class="summary-box"><span>Best selection</span><strong>${esc(selections[0]?.name||"—")}</strong><small>${selections[0]?money(selections[0].pl)+" P/L • "+pct(selections[0].roi)+" ROI":" "}</small></div>
- <div class="summary-box"><span>Best league</span><strong>${esc(leagues[0]?.name||"—")}</strong><small>${leagues[0]?money(leagues[0].pl)+" P/L • "+pct(leagues[0].roi)+" ROI":" "}</small></div>
- <div class="summary-box"><span>Average stake</span><strong>${money(s.bets?s.stake/s.bets:0)}</strong></div></div>`;
+ const detail=r=>r?`${money(r.pl)} P/L · ${pct(r.roi)} ROI · ${r.bets} bet${r.bets===1?"":"s"}`:"No settled bets";
+ const selectionDetail=selections[0]?`${esc(selections[0].topMarket||"Market not set")} · ${detail(selections[0])}`:"No settled bets";
+ $("summary").innerHTML=`<div class="summary-intro"><b>How this works</b><span>“Best” means the highest total P/L from settled bets in that category. ROI is shown so you can see return relative to stake.</span></div>
+ <div class="summary-grid">
+  <div class="summary-box"><span>🏆 Best market by P/L</span><strong>${esc(markets[0]?.name||"—")}</strong><small>${markets[0]?detail(markets[0]):"No settled bets"}</small></div>
+  <div class="summary-box"><span>🎯 Best selection by P/L</span><strong>${esc(selections[0]?.name||"—")}</strong><small>${selectionDetail}</small></div>
+  <div class="summary-box"><span>🏟️ Best league by P/L</span><strong>${esc(leagues[0]?.name||"—")}</strong><small>${leagues[0]?detail(leagues[0]):"No settled bets"}</small></div>
+  <div class="summary-box"><span>💷 Average stake</span><strong>${money(s.bets?s.stake/s.bets:0)}</strong><small>Across ${s.bets} total bet${s.bets===1?"":"s"}</small></div>
+ </div>`;
 }
 
 function setupAnalyticsTabs(){
@@ -211,6 +230,30 @@ function draw(id,type,labels,data,label){
    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false}},
    scales:{y:{ticks:{callback:v=>"£"+v}}}}});
  }catch(err){console.warn("Chart error:",err)}
+}
+
+function renderHistoryChart(){
+ try{
+  const el=$("historyPlChart");
+  if(!el || typeof Chart==="undefined") return;
+  const rows=filtered().filter(b=>b.status!=="Pending").slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+  let run=0;
+  const labels=rows.map(b=>fmtDate(b.date));
+  const data=rows.map(b=>{run+=calc(b).pl;return +run.toFixed(2)});
+  if(historyChart) historyChart.destroy();
+  historyChart=new Chart(el,{type:"line",data:{labels,datasets:[{
+    label:"Cumulative P/L",data,borderWidth:3,tension:.35,pointRadius:3,pointHoverRadius:6,
+    fill:true
+  }]},options:{
+    responsive:true,maintainAspectRatio:false,
+    interaction:{mode:"index",intersect:false},
+    plugins:{legend:{display:true,position:"top"},tooltip:{callbacks:{label:c=>" P/L: £"+Number(c.parsed.y||0).toFixed(2)}}},
+    scales:{x:{grid:{display:false},ticks:{color:"#91a0ba",maxTicksLimit:10}},
+      y:{beginAtZero:false,grid:{color:"rgba(145,160,186,.14)"},ticks:{color:"#91a0ba",callback:v=>"£"+Number(v).toFixed(0)}}}
+  }});
+  const empty=$("historyChartEmpty");
+  if(empty) empty.classList.toggle("hidden",rows.length>0);
+ }catch(err){console.warn("History chart error:",err)}
 }
 
 function resetForm(){
