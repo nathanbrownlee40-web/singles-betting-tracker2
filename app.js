@@ -55,6 +55,7 @@ function render(){
  const s=totalStats();
  const hp=(id,val,cls)=>{const el=$(id);if(el){el.textContent=val;if(cls)el.className=cls}};
  hp("historyKpiBets",s.bets);hp("historyKpiWin",pct(s.win));hp("historyKpiStake",money(s.stake));hp("historyKpiReturns",money(s.ret));hp("historyKpiProfit",money(s.pl),s.pl>=0?"positive":"negative");hp("historyKpiRoi",pct(s.roi));
+ hp("dashKpiBets",s.bets);hp("dashKpiWin",pct(s.win));hp("dashKpiStake",money(s.stake));hp("dashKpiReturns",money(s.ret));hp("dashKpiProfit",money(s.pl),s.pl>=0?"positive":"negative");hp("dashKpiRoi",pct(s.roi));
  renderHistory();renderHistoryChart();renderDashLists();renderAnalytics();renderCharts();
 }
 function filtered(){
