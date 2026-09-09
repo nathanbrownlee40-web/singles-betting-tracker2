@@ -80,3 +80,10 @@
   .dashboard-mini-stats .mini-stat{grid-column:span 3}
   .dashboard-mini-stats .mini-stat:nth-child(n+5){grid-column:span 4}
 }
+
+/* League × Market metric toggle */
+.league-market-controls{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:0 0 10px;color:#7f8da8;font-size:11px;font-weight:700}
+.league-market-toggle{display:inline-flex;padding:3px;border:1px solid #26324c;border-radius:9px;background:#0b1324}
+.league-market-toggle button{border:0;background:transparent;color:#7f8da8;padding:6px 10px;border-radius:7px;font-size:11px;font-weight:800;cursor:pointer}
+.league-market-toggle button.active{background:#202a43;color:#eef2fa}
+@media(max-width:500px){.league-market-controls{justify-content:space-between}.league-market-toggle button{padding:6px 9px}}

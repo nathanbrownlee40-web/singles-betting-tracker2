@@ -3,6 +3,7 @@ let bets=load();
 let charts={};
 const metricModes={market:"roi",selection:"roi",league:"roi",odds:"roi"};
 let historyChart=null;
+let leagueMarketMetric="win";
 
 const $=id=>document.getElementById(id);
 const money=n=>`£${Number(n||0).toFixed(2)}`;
@@ -194,17 +195,9 @@ function renderLeagueMarketBreakdown(){
  const el=$("leagueMarketBreakdown");
  if(!el)return;
  if(!leagues.length){el.innerHTML='<div class="analytics-empty">No settled bets yet.</div>';return;}
- el.innerHTML=`<div class="league-market-list">${leagues.map(g=>{
+ el.innerHTML=`<div class="league-market-controls"><span>Show</span><div class="league-market-toggle" role="group" aria-label="League market metric"><button type="button" class="${leagueMarketMetric==="win"?"active":""}" data-league-market-metric="win">Win Rate</button><button type="button" class="${leagueMarketMetric==="roi"?"active":""}" data-league-market-metric="roi">ROI</button></div></div><div class="league-market-list">${leagues.map(g=>{
    const best=g.markets[0];
-   return `<div class="league-market-card">
-     <div class="league-market-head"><div><strong>${esc(g.name)}</strong><small>${g.markets.length} market${g.markets.length===1?"":"s"} tracked</small></div><span class="league-best">Best: ${esc(best.name)}</span></div>
-     <div class="league-market-rows">${g.markets.map(r=>`<div class="league-market-row ${r.pl>0?"market-positive":r.pl<0?"market-negative":"market-neutral"}>
-       <span class="league-market-name">${esc(r.name)}</span>
-       <span>${r.bets} bet${r.bets===1?"":"s"} · ${r.win.toFixed(0)}% win</span>
-       <span class="${r.pl>=0?"positive":"negative"}">${r.pl>=0?"+":""}${money(r.pl)}</span>
-       <span class="${r.roi>=0?"positive":"negative"}">${r.roi>=0?"+":""}${r.roi.toFixed(1)}% ROI</span>
-     </div>`).join("")}</div>
-   </div>`;
+   return `<div class="league-market-card"><div class="league-market-head"><div><strong>${esc(g.name)}</strong><small>${g.markets.length} market${g.markets.length===1?"":"s"} tracked</small></div><span class="league-best">Best: ${esc(best.name)}</span></div><div class="league-market-rows">${g.markets.map(r=>`<div class="league-market-row ${r.pl>0?"market-positive":r.pl<0?"market-negative":"market-neutral"}><span class="league-market-name">${esc(r.name)}</span><span>${r.bets} bet${r.bets===1?"":"s"} · ${r.win.toFixed(0)}% win</span><span class="${r.pl>=0?"positive":"negative"}">${r.pl>=0?"+":""}${money(r.pl)}</span><span class="${leagueMarketMetric==="win"?(r.win>=50?"positive":"negative"):(r.roi>=0?"positive":"negative")}">${leagueMarketMetric==="win"?r.win.toFixed(1)+"% Win Rate":(r.roi>=0?"+":"")+r.roi.toFixed(1)+"% ROI"}</span></div>`).join("")}</div></div>`;
  }).join("")}</div>`;
 }
 
@@ -430,6 +423,13 @@ $("screenshot").onchange=async e=>{
 $("saveOcr").onclick=()=>{
  const b={id:crypto.randomUUID(),date:$("ocrDate").value,bookmaker:$("ocrBookmaker").value,selection:$("ocrSelection").value,event:$("ocrEvent").value,league:$("ocrLeague").value,market:$("ocrMarket").value,odds:+$("ocrOdds").value,stake:+$("ocrStake").value,status:$("ocrStatusSelect").value,returns:+$("ocrReturns").value||0,notes:"Imported from screenshot"};
  if(!b.selection||!b.odds||!b.stake){alert("Please fill in selection, odds and stake.");return}bets.push(b);save();showTab("dashboard");$("ocrStatus").textContent="Saved.";};
+
+document.addEventListener("click",e=>{
+ const btn=e.target.closest("[data-league-market-metric]");
+ if(!btn)return;
+ leagueMarketMetric=btn.dataset.leagueMarketMetric==="roi"?"roi":"win";
+ renderLeagueMarketBreakdown();
+});
 
 resetForm();setupAnalyticsTabs();render();
 
