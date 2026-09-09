@@ -160,3 +160,22 @@ body.view-desktop .dashboard-mini-stats .mini-stat{grid-column:auto}
 .league-market-row>span:nth-child(3).positive{color:#61d69b!important}
 .league-market-row>span:nth-child(3).negative{color:#ff6d7d!important}
 @media(max-width:700px){.league-best-stack{width:100%;align-items:stretch}.league-best{display:block;text-align:left}}
+
+
+/* v21: compact collapsible monthly history breakdown */
+.history-month-panel{margin-bottom:16px;padding:0;overflow:hidden;background:#0d1527}
+.history-month-summary{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 15px;cursor:pointer;user-select:none}
+.history-month-summary::-webkit-details-marker{display:none}
+.history-month-summary strong{display:block;font-size:14px;color:#eef2fa}
+.history-month-summary span:not(.collapse-icon){display:block;margin-top:3px;color:#7f8da8;font-size:11px}
+.history-month-panel[open] .collapse-icon{transform:rotate(180deg)}
+.history-month-panel[open] #monthlyHistoryBreakdown{padding:0 15px 14px}
+.history-month-table-wrap{overflow:auto}
+.history-month-table{width:100%;min-width:560px;border-collapse:collapse}
+.history-month-table th,.history-month-table td{padding:8px 9px;font-size:12px;border-bottom:1px solid #202c44}
+.history-month-table th{color:#7f8da8;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+.history-month-table td:first-child{color:#eef2fa}
+.history-month-table .positive{color:#61d69b!important;font-weight:800}
+.history-month-table .negative{color:#ff6d7d!important;font-weight:800}
+.history-month-empty{padding:12px 0;color:#7f8da8;font-size:12px}
+@media(max-width:500px){.history-month-summary{padding:12px 13px}.history-month-panel[open] #monthlyHistoryBreakdown{padding:0 13px 12px}}

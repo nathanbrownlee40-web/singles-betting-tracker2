@@ -1,4 +1,4 @@
-const CACHE = "singles-betting-tracker-v20";
+const CACHE = "singles-betting-tracker-v21";
 const ASSETS = [
   "./",
   "./index.html",

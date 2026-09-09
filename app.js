@@ -66,8 +66,32 @@ function filtered(){
   return (!q||text.includes(q))&&(!st||b.status===st)&&(!ma||(b.market||"").toLowerCase().includes(ma))&&(!le||(b.league||"").toLowerCase().includes(le))&&(!from||String(b.date).slice(0,10)>=from)&&(!to||String(b.date).slice(0,10)<=to)
  }).sort((a,b)=>new Date(b.date)-new Date(a.date));
 }
+function renderMonthlyHistoryBreakdown(rows){
+ const el=$("monthlyHistoryBreakdown");
+ if(!el)return;
+ const settled=rows.filter(b=>b.status!=="Pending");
+ if(!settled.length){el.innerHTML='<div class="history-month-empty">No settled bets in the current filter.</div>';return;}
+ const months={};
+ settled.forEach(b=>{
+   const d=new Date(b.date);
+   const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+   if(!months[key])months[key]={year:d.getFullYear(),month:d.getMonth(),bets:0,stake:0,pl:0,wins:0,odds:0,oddsN:0};
+   const m=months[key],c=calc(b);
+   m.bets++;m.stake+=c.stake;m.pl+=c.pl;if(b.status==="Win")m.wins++;
+   if(+b.odds){m.odds+=+b.odds;m.oddsN++;}
+ });
+ const monthNames=["January","February","March","April","May","June","July","August","September","October","November","December"];
+ const rowsHTML=Object.values(months).sort((a,b)=>b.year-a.year||b.month-a.month).map(m=>{
+   const win=m.bets?m.wins/m.bets*100:0;
+   const avg=m.oddsN?m.odds/m.oddsN:0;
+   return `<tr><td><b>${monthNames[m.month]} ${m.year}</b></td><td>${m.bets}</td><td>${win.toFixed(1)}%</td><td class="${m.pl>=0?"positive":"negative"}">${m.pl>=0?"+":""}${money(m.pl)}</td><td>${avg.toFixed(2)}</td></tr>`;
+ }).join("");
+ el.innerHTML=`<div class="history-month-table-wrap"><table class="history-month-table"><thead><tr><th>Month</th><th>Bets</th><th>Win Rate</th><th>P/L</th><th>Avg Odds</th></tr></thead><tbody>${rowsHTML}</tbody></table></div>`;
+}
+
 function renderHistory(){
  const rows=filtered();
+ renderMonthlyHistoryBreakdown(rows);
  if(!rows.length){
    $("historyBody").innerHTML=`<tr><td colspan="10"><div class="history-empty">No bets yet. Add one or load demo data.</div></td></tr>`;
    return;
@@ -197,8 +221,10 @@ function renderLeagueMarketBreakdown(){
  if(!leagues.length){el.innerHTML='<div class="analytics-empty">No settled bets yet.</div>';return;}
  el.innerHTML=`<div class="league-market-controls"><span>Show</span><div class="league-market-toggle" role="group" aria-label="League market metric"><button type="button" class="${leagueMarketMetric==="win"?"active":""}" data-league-market-metric="win">Win Rate</button><button type="button" class="${leagueMarketMetric==="roi"?"active":""}" data-league-market-metric="roi">ROI</button></div></div><div class="league-market-list">${leagues.map(g=>{
    const best=g.markets[0];
-   const worst=g.markets[g.markets.length-1];
-   return `<div class="league-market-card"><div class="league-market-head"><div><strong>${esc(g.name)}</strong><small>${g.markets.length} market${g.markets.length===1?"":"s"} tracked</small></div><div class="league-best-stack"><span class="league-best ${best.pl>0?"best-positive":best.pl<0?"best-negative":"best-neutral"}"><span class="league-best-label">Best: ${esc(best.name)}</span> <span class="league-best-pl ${best.pl>=0?"positive":"negative"}">${best.pl>=0?"+":""}${money(best.pl)}</span></span><span class="league-best ${worst.pl>0?"best-positive":worst.pl<0?"best-negative":"best-neutral"}"><span class="league-best-label">Worst: ${esc(worst.name)}</span> <span class="league-best-pl ${worst.pl>=0?"positive":"negative"}">${worst.pl>=0?"+":""}${money(worst.pl)}</span></span></div></div><div class="league-market-rows">${g.markets.map(r=>`<div class="league-market-row ${r.pl>0?"market-positive":r.pl<0?"market-negative":"market-neutral"}><span class="league-market-name">${esc(r.name)}</span><span>${r.bets} bet${r.bets===1?"":"s"} · ${r.win.toFixed(0)}% win</span><span class="${r.pl>=0?"positive":"negative"}">${r.pl>=0?"+":""}${money(r.pl)}</span><span class="${leagueMarketMetric==="win"?(r.win>=50?"positive":"negative"):(r.roi>=0?"positive":"negative")}">${leagueMarketMetric==="win"?r.win.toFixed(1)+"% Win Rate":(r.roi>=0?"+":"")+r.roi.toFixed(1)+"% ROI"}</span></div>`).join("")}</div></div>`;
+   const worstCandidates=g.markets.filter(r=>r.win<50).sort((a,b)=>a.pl-b.pl);
+   const worst=worstCandidates[0];
+   const worstHTML=worst?`<span class="league-best ${worst.pl>0?"best-positive":worst.pl<0?"best-negative":"best-neutral"}"><span class="league-best-label">Worst: ${esc(worst.name)}</span> <span class="league-best-pl ${worst.pl>=0?"positive":"negative"}">${worst.pl>=0?"+":""}${money(worst.pl)}</span></span>`:"";
+   return `<div class="league-market-card"><div class="league-market-head"><div><strong>${esc(g.name)}</strong><small>${g.markets.length} market${g.markets.length===1?"":"s"} tracked</small></div><div class="league-best-stack"><span class="league-best ${best.pl>0?"best-positive":best.pl<0?"best-negative":"best-neutral"}"><span class="league-best-label">Best: ${esc(best.name)}</span> <span class="league-best-pl ${best.pl>=0?"positive":"negative"}">${best.pl>=0?"+":""}${money(best.pl)}</span></span>${worstHTML}</div></div><div class="league-market-rows">${g.markets.map(r=>`<div class="league-market-row ${r.pl>0?"market-positive":r.pl<0?"market-negative":"market-neutral"}><span class="league-market-name">${esc(r.name)}</span><span>${r.bets} bet${r.bets===1?"":"s"} · ${r.win.toFixed(0)}% win</span><span class="${r.pl>=0?"positive":"negative"}">${r.pl>=0?"+":""}${money(r.pl)}</span><span class="${leagueMarketMetric==="win"?(r.win>=50?"positive":"negative"):(r.roi>=0?"positive":"negative")}">${leagueMarketMetric==="win"?r.win.toFixed(1)+"% Win Rate":(r.roi>=0?"+":"")+r.roi.toFixed(1)+"% ROI"}</span></div>`).join("")}</div></div>`;
  }).join("")}</div>`;
 }
 

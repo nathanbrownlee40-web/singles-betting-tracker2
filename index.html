@@ -135,6 +135,10 @@
           <div id="historyDayDetails" class="history-day-details hidden" aria-live="polite"></div>
           <div id="historyChartEmpty" class="chart-empty hidden">Add or load settled bets to see your P/L line.</div>
         </div>
+        <details class="panel history-month-panel">
+          <summary class="history-month-summary"><div><strong>Monthly Profit Breakdown</strong><span>See your monthly P/L, win rate, bets and average odds.</span></div><span class="collapse-icon">▾</span></summary>
+          <div id="monthlyHistoryBreakdown"></div>
+        </details>
         <div class="filters">
           <input id="search" placeholder="Search selection/event/league/market...">
           <select id="filterStatus"><option value="">All statuses</option><option>Win</option><option>Loss</option><option>Void</option><option>Pending</option></select>
@@ -207,10 +211,10 @@
   </main>
 
   <footer>Singles Betting Tracker • Data is stored locally in this browser.</footer>
-  <script src="app.js?v=20"></script>
+  <script src="app.js?v=21"></script>
 <script>
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js?v=19", { updateViaCache: "none" }).then(reg => reg.update()));
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js?v=21", { updateViaCache: "none" }).then(reg => reg.update()));
 }
 </script>
 </body>
