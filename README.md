@@ -1,4 +1,4 @@
-# Singles Betting Tracker
+# Top Daily Value
 
 A mobile-friendly singles betting tracker that runs as a static website.
 
