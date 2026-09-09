@@ -71,8 +71,9 @@
 .league-market-row.market-positive{background:linear-gradient(90deg,rgba(35,140,91,.20),rgba(16,26,46,.92));border:1px solid rgba(97,214,155,.20)}
 .league-market-row.market-negative{background:linear-gradient(90deg,rgba(180,50,70,.20),rgba(16,26,46,.92));border:1px solid rgba(255,109,125,.20)}
 .league-market-row.market-neutral{background:#101a2e;border:1px solid #26324c}
-.league-market-row.market-positive .league-market-name{color:#8be7b8}
-.league-market-row.market-negative .league-market-name{color:#ff9aa7}
+.league-market-row.market-positive .league-market-name,.league-market-row.market-negative .league-market-name,.league-market-row.market-neutral .league-market-name{color:#ffffff!important}
+.league-market-row>span:nth-child(2){color:#ffffff!important}
+.league-market-head small{color:#ffffff}
 
 /* Keep the 7 Dashboard stats in exactly two rows; give the final 3 cards more room on mobile. */
 @media(max-width:700px){
@@ -87,3 +88,19 @@
 .league-market-toggle button{border:0;background:transparent;color:#7f8da8;padding:6px 10px;border-radius:7px;font-size:11px;font-weight:800;cursor:pointer}
 .league-market-toggle button.active{background:#202a43;color:#eef2fa}
 @media(max-width:500px){.league-market-controls{justify-content:space-between}.league-market-toggle button{padding:6px 9px}}
+
+
+/* Mobile fallback: keeps Android/tablet browsers in the compact layout even if they report a wider desktop-style viewport. */
+@media (pointer:coarse) and (max-width:1100px){
+  .topbar{align-items:flex-start;flex-direction:column}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .grid.two,.form-grid{grid-template-columns:1fr}
+  .filters{grid-template-columns:1fr 1fr}
+  .history-stats{grid-template-columns:repeat(3,1fr)}
+}
+@media (pointer:coarse) and (max-width:700px){
+  .filters{grid-template-columns:1fr}
+  .dashboard-cards{grid-template-columns:1fr}
+  .history-stats{grid-template-columns:repeat(2,1fr)}
+  .history-day-grid{grid-template-columns:repeat(2,1fr)}
+}
