@@ -177,7 +177,39 @@ function tableHTML(rows,metric){
   </div>`;
 }
 
+function renderLeagueMarketBreakdown(){
+ const groups={};
+ validBets().forEach(b=>{
+   const league=(b.league||"Unknown").trim()||"Unknown";
+   const market=(b.market||"Unknown").trim()||"Unknown";
+   if(!groups[league])groups[league]={name:league,markets:{}};
+   if(!groups[league].markets[market])groups[league].markets[market]={name:market,bets:0,stake:0,ret:0,pl:0,wins:0};
+   const r=groups[league].markets[market],c=calc(b);
+   r.bets++;r.stake+=c.stake;r.ret+=c.ret;r.pl+=c.pl;if(b.status==="Win")r.wins++;
+ });
+ const leagues=Object.values(groups).map(g=>{
+   const markets=Object.values(g.markets).map(r=>({...r,roi:r.stake?r.pl/r.stake*100:0,win:r.bets?r.wins/r.bets*100:0})).sort((a,b)=>b.pl-a.pl);
+   return {...g,markets};
+ }).sort((a,b)=>(b.markets[0]?.pl||0)-(a.markets[0]?.pl||0));
+ const el=$("leagueMarketBreakdown");
+ if(!el)return;
+ if(!leagues.length){el.innerHTML='<div class="analytics-empty">No settled bets yet.</div>';return;}
+ el.innerHTML=`<div class="league-market-list">${leagues.map(g=>{
+   const best=g.markets[0];
+   return `<div class="league-market-card">
+     <div class="league-market-head"><div><strong>${esc(g.name)}</strong><small>${g.markets.length} market${g.markets.length===1?"":"s"} tracked</small></div><span class="league-best">Best: ${esc(best.name)}</span></div>
+     <div class="league-market-rows">${g.markets.map(r=>`<div class="league-market-row">
+       <span class="league-market-name">${esc(r.name)}</span>
+       <span>${r.bets} bet${r.bets===1?"":"s"} · ${r.win.toFixed(0)}% win</span>
+       <span class="${r.pl>=0?"positive":"negative"}">${r.pl>=0?"+":""}${money(r.pl)}</span>
+       <span class="${r.roi>=0?"positive":"negative"}">${r.roi>=0?"+":""}${r.roi.toFixed(1)}% ROI</span>
+     </div>`).join("")}</div>
+   </div>`;
+ }).join("")}</div>`;
+}
+
 function renderAnalytics(){
+ renderLeagueMarketBreakdown();
  const markets=aggregate("market"), selections=aggregate("selection"), leagues=aggregate("league");
  $("marketTable").innerHTML=tableHTML(markets,metricModes.market);
  $("selectionTable").innerHTML=tableHTML(selections,metricModes.selection);
