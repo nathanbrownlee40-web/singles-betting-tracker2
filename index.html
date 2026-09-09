@@ -196,7 +196,7 @@
   <script src="app.js"></script>
 <script>
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js?v=5", { updateViaCache: "none" }));
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js?v=6", { updateViaCache: "none" }).then(reg => reg.update()));
 }
 </script>
 </body>

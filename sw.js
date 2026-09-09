@@ -1,4 +1,4 @@
-const CACHE = "singles-betting-tracker-v5";
+const CACHE = "singles-betting-tracker-v6";
 const ASSETS = [
   "./",
   "./index.html",
@@ -23,8 +23,27 @@ self.addEventListener("activate", event => {
   );
 });
 
+// Prefer the live GitHub Pages files for app code/HTML so installed PWAs update promptly.
+// If offline, fall back to the cached version.
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+  const isAppAsset = url.pathname.endsWith("/") ||
+    /\/(index\.html|app\.js|styles\.css|manifest\.webmanifest|sw\.js)$/.test(url.pathname);
+
+  if (isAppAsset) {
+    event.respondWith(
+      fetch(event.request, { cache: "no-store" }).then(response => {
+        if (response && response.ok && !url.pathname.endsWith("sw.js")) {
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => cache.put(event.request, copy));
+        }
+        return response;
+      }).catch(() => caches.match(event.request).then(cached => cached || caches.match("./index.html")))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
       const copy = response.clone();
