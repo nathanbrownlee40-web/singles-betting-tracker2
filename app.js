@@ -316,8 +316,6 @@ $("betForm").addEventListener("submit",e=>{e.preventDefault();const id=$("betId"
 $("resetForm").onclick=resetForm;
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>showTab(t.dataset.tab));
 ["search","filterStatus","filterMarket","filterLeague","filterFrom","filterTo"].forEach(id=>$(id).addEventListener("input",renderHistory));
-$("clearBtn").onclick=()=>{if(confirm("Delete every saved bet?")){bets=[];save()}};
-$("demoBtn").onclick=demo;
 
 function download(name,text,type){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();URL.revokeObjectURL(a.href)}
 $("exportJson").onclick=()=>download("singles-betting-tracker.json",JSON.stringify(bets,null,2),"application/json");

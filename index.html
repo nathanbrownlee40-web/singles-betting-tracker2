@@ -20,8 +20,6 @@
     </div>
     <div class="top-actions">
       <button class="secondary" id="installPwa">📱 Install App</button>
-      <button class="secondary" id="demoBtn">Load demo data</button>
-      <button class="danger" id="clearBtn">Clear all</button>
     </div>
   </header>
 
@@ -204,7 +202,7 @@
   <script src="app.js"></script>
 <script>
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js?v=6", { updateViaCache: "none" }).then(reg => reg.update()));
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js?v=7", { updateViaCache: "none" }).then(reg => reg.update()));
 }
 </script>
 </body>
