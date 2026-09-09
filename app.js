@@ -22,7 +22,7 @@ function fmtDate(v){if(!v)return "";const d=new Date(v);return isNaN(d)?v:d.toLo
 function validBets(){return bets.filter(b=>b.status!=="Pending")}
 function aggregate(field){
  const m={};
- validBets().forEach(b=>{const k=b[field]||"Unknown";if(!m[k])m[k]={name:k,bets:0,stake:0,ret:0,pl:0,wins:0};
+ validBets().forEach(b=>{const k=(b[field]||"Unknown").trim()||"Unknown";if(!m[k])m[k]={name:k,bets:0,stake:0,ret:0,pl:0,wins:0};
  const c=calc(b);m[k].bets++;m[k].stake+=c.stake;m[k].ret+=c.ret;m[k].pl+=c.pl;if(b.status==="Win")m[k].wins++});
  return Object.values(m).map(x=>({...x,roi:x.stake?x.pl/x.stake*100:0,win:x.bets?x.wins/x.bets*100:0})).sort((a,b)=>b.pl-a.pl)
 }
@@ -59,22 +59,50 @@ function listHTML(rows){
  return `<div class="stat-list">${rows.slice(0,6).map(x=>`<div class="stat-row"><span><b>${esc(x.name)}</b><br><small>${x.bets} bets • ${pct(x.roi)} ROI</small></span><strong class="${x.pl>=0?"positive":"negative"}">${money(x.pl)}</strong></div>`).join("")}</div>`;
 }
 function renderDashLists(){$("marketDash").innerHTML=listHTML(aggregate("market"));$("leagueDash").innerHTML=listHTML(aggregate("league"))}
-function tableHTML(rows){
+function tableHTML(rows,metric="roi"){
  if(!rows.length)return `<p class="muted">No settled data yet.</p>`;
- return `<div class="table-wrap"><table><thead><tr><th>Name</th><th>Bets</th><th>Stake</th><th>P/L</th><th>ROI</th><th>Win %</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.bets}</td><td>${money(x.stake)}</td><td class="${x.pl>=0?"positive":"negative"}">${money(x.pl)}</td><td>${pct(x.roi)}</td><td>${pct(x.win)}</td></tr>`).join("")}</tbody></table></div>`
+ const label=metric==="win"?"Win %":"ROI";
+ return `<div class="table-wrap"><table><thead><tr><th>Name</th><th>Bets</th><th>Stake</th><th>P/L</th><th>${label}</th><th>Win %</th></tr></thead><tbody>${rows.map(x=>{
+   const value=metric==="win"?x.win:x.roi;
+   const cls=metric==="win"?(value>=50?"metric-good":value<50?"metric-bad":"metric-neutral"):(value>0?"metric-good":value<0?"metric-bad":"metric-neutral");
+   return `<tr><td><b>${esc(x.name)}</b></td><td>${x.bets}</td><td>${money(x.stake)}</td><td class="${x.pl>=0?"positive":"negative"}">${money(x.pl)}</td><td class="${cls}">${pct(value)}</td><td>${pct(x.win)}</td></tr>`;
+ }).join("")}</tbody></table></div>`
 }
+const metricModes={market:"roi",selection:"roi",league:"roi",odds:"roi"};
 function renderAnalytics(){
- $("marketTable").innerHTML=tableHTML(aggregate("market"));
- $("leagueTable").innerHTML=tableHTML(aggregate("league"));
+ const markets=aggregate("market"), selections=aggregate("selection"), leagues=aggregate("league");
+ $("marketTable").innerHTML=tableHTML(markets,metricModes.market);
+ $("selectionTable").innerHTML=tableHTML(selections,metricModes.selection);
+ $("leagueTable").innerHTML=tableHTML(leagues,metricModes.league);
+
  const ranges=[["1.01–1.49",1.01,1.49],["1.50–1.99",1.5,1.99],["2.00–2.99",2,2.99],["3.00–4.99",3,4.99],["5.00+",5,999]];
- const rows=ranges.map(r=>{const bs=validBets().filter(b=>(+b.odds||0)>=r[1]&&(+b.odds||0)<=r[2]);let st=0,pl=0,w=0;bs.forEach(b=>{const c=calc(b);st+=c.stake;pl+=c.pl;if(b.status==="Win")w++});return{name:r[0],bets:bs.length,stake:st,pl,roi:st?pl/st*100:0,win:bs.length?w/bs.length*100:0}}).filter(x=>x.bets);
- $("oddsTable").innerHTML=tableHTML(rows);
- const s=totalStats(), mk=aggregate("market"), lg=aggregate("league");
+ const rows=ranges.map(r=>{
+   const bs=validBets().filter(b=>(+b.odds||0)>=r[1]&&(+b.odds||0)<=r[2]);
+   let st=0,pl=0,w=0;
+   bs.forEach(b=>{const c=calc(b);st+=c.stake;pl+=c.pl;if(b.status==="Win")w++});
+   return{name:r[0],bets:bs.length,stake:st,pl,roi:st?pl/st*100:0,win:bs.length?w/bs.length*100:0}
+ }).filter(x=>x.bets);
+ $("oddsTable").innerHTML=tableHTML(rows,metricModes.odds);
+
+ const s=totalStats();
  $("summary").innerHTML=`<div class="summary-grid">
- <div class="summary-box"><span>Best market</span><strong>${esc(mk[0]?.name||"—")}</strong></div>
- <div class="summary-box"><span>Best league</span><strong>${esc(lg[0]?.name||"—")}</strong></div>
- <div class="summary-box"><span>Settled bets</span><strong>${validBets().length}</strong></div>
+ <div class="summary-box"><span>Best market</span><strong>${esc(markets[0]?.name||"—")}</strong><small>${markets[0]?money(markets[0].pl)+" P/L • "+pct(markets[0].roi)+" ROI":" "}</small></div>
+ <div class="summary-box"><span>Best selection</span><strong>${esc(selections[0]?.name||"—")}</strong><small>${selections[0]?money(selections[0].pl)+" P/L • "+pct(selections[0].roi)+" ROI":" "}</small></div>
+ <div class="summary-box"><span>Best league</span><strong>${esc(leagues[0]?.name||"—")}</strong><small>${leagues[0]?money(leagues[0].pl)+" P/L • "+pct(leagues[0].roi)+" ROI":" "}</small></div>
  <div class="summary-box"><span>Average stake</span><strong>${money(s.bets?s.stake/s.bets:0)}</strong></div></div>`;
+}
+
+function setupAnalyticsTabs(){
+ document.querySelectorAll(".analytics-tab").forEach(btn=>btn.onclick=()=>{
+   document.querySelectorAll(".analytics-tab").forEach(x=>x.classList.toggle("active",x===btn));
+   document.querySelectorAll(".analytics-view").forEach(x=>x.classList.toggle("active",x.id==="analytics-"+btn.dataset.analytics));
+ });
+ document.querySelectorAll(".toggleMetric").forEach(btn=>btn.onclick=()=>{
+   const k=btn.dataset.target;
+   metricModes[k]=metricModes[k]==="roi"?"win":"roi";
+   btn.textContent=metricModes[k]==="roi"?"ROI":"Win %";
+   renderAnalytics();
+ });
 }
 function renderCharts(){
  const settled=bets.filter(b=>b.status!=="Pending").sort((a,b)=>new Date(a.date)-new Date(b.date));let run=0;
@@ -125,30 +153,81 @@ $("exportJson").onclick=()=>download("singles-betting-tracker.json",JSON.stringi
 $("exportCsv").onclick=()=>{const heads=["date","bookmaker","selection","event","league","market","odds","stake","status","returns","profit_loss","notes"];const rows=bets.map(b=>heads.map(h=>h==="profit_loss"?calc(b).pl:b[h]??""));const csv=[heads,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");download("singles-betting-tracker.csv",csv,"text/csv")};
 $("importJson").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!Array.isArray(x))throw 0;bets=x;save();alert("Imported successfully.")}catch{alert("That JSON file is not valid.")}};r.readAsText(f)};
 
+function cleanOCRText(t){
+ return t.replace(/[|]/g,"I").replace(/\r/g,"").replace(/[ \t]+/g," ").replace(/\n{2,}/g,"\n").trim();
+}
+function firstMatch(text, patterns){
+ for(const p of patterns){const m=text.match(p);if(m&&m[1])return m[1].trim()}
+ return "";
+}
+function inferMarket(selection,text){
+ const s=(selection+" "+text).toLowerCase();
+ if(/card/.test(s)) return "Total Cards";
+ if(/corner/.test(s)) return "Corners";
+ if(/both teams|btts|score/.test(s)) return "Goals";
+ if(/over .*goal|under .*goal|total goals/.test(s)) return "Goals";
+ if(/match result|to win|draw no bet|double chance/.test(s)) return "Match Result";
+ return "";
+}
 $("screenshot").onchange=async e=>{
  const file=e.target.files[0];if(!file)return;
  $("ocrStatus").textContent="Reading screenshot…";
  $("ocrPreview").innerHTML=`<img src="${URL.createObjectURL(file)}" alt="Betting screenshot">`;
+ $("ocrFields").classList.remove("hidden");$("saveOcr").classList.remove("hidden");
  try{
-  const result=await Tesseract.recognize(file,"eng",{logger:m=>{if(m.status==="recognizing text")$("ocrStatus").textContent=`Reading screenshot… ${Math.round((m.progress||0)*100)}%`}});
-  const text=result.data.text;
-  const nums=[...text.matchAll(/(?:£|GBP)?\s*(\d+(?:\.\d{1,2})?)/gi)].map(m=>+m[1]).filter(n=>n>0);
-  const oddsMatch=text.match(/\b([1-9]\d?\.\d{1,2})\b/);
+  const result=await Tesseract.recognize(file,"eng",{logger:m=>{
+   if(m.status==="recognizing text")$("ocrStatus").textContent=`Reading screenshot… ${Math.round((m.progress||0)*100)}%`;
+  }});
+  const text=cleanOCRText(result.data.text);
+  const lower=text.toLowerCase();
+
+  const bookmaker=firstMatch(text,[/(bet365|sky bet|ladbrokes|william hill|paddy power|coral|betfred|unibet|betfair|boylesports|888sport)/i]);
+  const oddsMatches=[...text.matchAll(/(?:@|odds?\s*[:\-]?\s*|price\s*[:\-]?\s*)(\d+(?:\.\d{1,2})?)/gi)];
+  const allDecimal=[...text.matchAll(/\b(\d+\.\d{1,2})\b/g)].map(m=>+m[1]).filter(n=>n>=1.01&&n<=100);
+  const odds=oddsMatches.length?+oddsMatches[0][1]:(allDecimal.length?allDecimal[0]:"");
+
+  const stakeMatch=text.match(/(?:stake|wager|bet amount|amount)\s*[:\-]?\s*[£$€]?\s*(\d+(?:\.\d{1,2})?)/i);
+  const returnMatch=text.match(/(?:return|returns|payout|potential return|possible return|win)\s*[:\-]?\s*[£$€]?\s*(\d+(?:\.\d{1,2})?)/i);
+  const stake=stakeMatch?+stakeMatch[1]:"";
+  const returns=returnMatch?+returnMatch[1]:"";
+
+  let selection=firstMatch(text,[
+   /(?:selection|bet|pick)\s*[:\-]\s*(.+)/i,
+   /(?:total cards|cards|total corners|corners|over|under)\s+([^\n]+)/i
+  ]);
+  selection=(selection||"").replace(/\s+(?:@|odds|stake|return).*/i,"").trim();
+
+  const event=firstMatch(text,[
+   /(?:event|fixture|match)\s*[:\-]\s*(.+)/i,
+   /\b([A-Za-z][A-Za-z .'-]{2,})\s+(?:v|vs|versus)\s+([A-Za-z][A-Za-z .'-]{2,})\b/i
+  ]);
+  const eventText=event||"";
+  let league=firstMatch(text,[/(premier league|championship|league one|league two|la liga|serie a|bundesliga|ligue 1|champions league|europa league|conference league|fa cup|carabao cup|world cup|euro)/i]);
+  let market=firstMatch(text,[/(total cards|match result|both teams to score|double chance|draw no bet|total goals|over\/under|corners)/i])||inferMarket(selection,text);
+
+  let status="Pending";
+  if(/\b(won|winner|win|settled win)\b/i.test(lower))status="Win";
+  else if(/\b(lost|loser|loss|settled loss)\b/i.test(lower))status="Loss";
+  else if(/\b(void|voided|push)\b/i.test(lower))status="Void";
+
   $("ocrDate").value=new Date().toISOString().slice(0,16);
-  $("ocrSelection").value=(text.match(/(?:selection|pick|bet)\s*[:\-]\s*(.+)/i)||[])[1]?.trim()||"";
-  $("ocrOdds").value=oddsMatch?oddsMatch[1]:"";
-  $("ocrStake").value=nums.length?Math.min(...nums):"";
-  $("ocrBookmaker").value=(text.match(/(bet365|sky bet|ladbrokes|william hill|paddy power|coral|betfred|unibet|betfair)/i)||[])[1]||"";
-  $("ocrEvent").value="";
-  $("ocrLeague").value="";
-  $("ocrMarket").value="";
-  $("ocrReturns").value="";
-  $("ocrFields").classList.remove("hidden");$("saveOcr").classList.remove("hidden");
-  $("ocrStatus").textContent="Done — check the fields below before saving.";
- }catch(err){$("ocrStatus").textContent="Couldn’t read that image. You can still add the bet manually."}
+  $("ocrBookmaker").value=bookmaker;
+  $("ocrSelection").value=selection;
+  $("ocrEvent").value=eventText;
+  $("ocrLeague").value=league;
+  $("ocrMarket").value=market;
+  $("ocrOdds").value=odds;
+  $("ocrStake").value=stake;
+  $("ocrStatusSelect").value=status;
+  $("ocrReturns").value=returns;
+
+  $("ocrStatus").textContent=text?"Done — fields have been filled where the screenshot text could be recognised. Check them before saving.":"No readable text was found — try a clearer screenshot.";
+ }catch(err){
+  $("ocrStatus").textContent="OCR failed on this image. Try a clearer/full-resolution screenshot or enter the bet manually.";
+ }
 };
 $("saveOcr").onclick=()=>{
  const b={id:crypto.randomUUID(),date:$("ocrDate").value,bookmaker:$("ocrBookmaker").value,selection:$("ocrSelection").value,event:$("ocrEvent").value,league:$("ocrLeague").value,market:$("ocrMarket").value,odds:+$("ocrOdds").value,stake:+$("ocrStake").value,status:$("ocrStatusSelect").value,returns:+$("ocrReturns").value||0,notes:"Imported from screenshot"};
  if(!b.selection||!b.odds||!b.stake){alert("Please fill in selection, odds and stake.");return}bets.push(b);save();showTab("dashboard");$("ocrStatus").textContent="Saved.";};
 
-resetForm();render();
+resetForm();setupAnalyticsTabs();render();

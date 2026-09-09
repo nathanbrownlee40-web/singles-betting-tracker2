@@ -145,13 +145,46 @@
     </section>
 
     <section id="analytics" class="tab-panel">
-      <div class="grid two">
-        <div class="panel"><div class="panel-head"><h2>Market Performance</h2></div><div id="marketTable"></div></div>
-        <div class="panel"><div class="panel-head"><h2>League Performance</h2></div><div id="leagueTable"></div></div>
+      <div class="analytics-tabs">
+        <button class="analytics-tab active" data-analytics="market">Markets</button>
+        <button class="analytics-tab" data-analytics="selection">Selections</button>
+        <button class="analytics-tab" data-analytics="league">Leagues</button>
+        <button class="analytics-tab" data-analytics="odds">Odds Range</button>
       </div>
-      <div class="grid two">
-        <div class="panel"><div class="panel-head"><h2>Odds Range</h2></div><div id="oddsTable"></div></div>
-        <div class="panel"><div class="panel-head"><h2>Overall Summary</h2></div><div id="summary"></div></div>
+
+      <div id="analytics-market" class="analytics-view active">
+        <div class="panel">
+          <div class="panel-head"><h2>Market Performance</h2><button class="toggleMetric" data-target="market">ROI</button></div>
+          <p class="muted">Broad categories such as Total Cards, Goals, Match Result, Corners.</p>
+          <div id="marketTable"></div>
+        </div>
+      </div>
+
+      <div id="analytics-selection" class="analytics-view">
+        <div class="panel">
+          <div class="panel-head"><h2>Selection Performance</h2><button class="toggleMetric" data-target="selection">ROI</button></div>
+          <p class="muted">Exact bets such as Over 3.5 Cards, Over 2.5 Goals, Arsenal to Win.</p>
+          <div id="selectionTable"></div>
+        </div>
+      </div>
+
+      <div id="analytics-league" class="analytics-view">
+        <div class="panel">
+          <div class="panel-head"><h2>League Performance</h2><button class="toggleMetric" data-target="league">ROI</button></div>
+          <div id="leagueTable"></div>
+        </div>
+      </div>
+
+      <div id="analytics-odds" class="analytics-view">
+        <div class="panel">
+          <div class="panel-head"><h2>Odds Range</h2><button class="toggleMetric" data-target="odds">ROI</button></div>
+          <div id="oddsTable"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>Overall Summary</h2></div>
+        <div id="summary"></div>
       </div>
     </section>
   </main>
