@@ -12,53 +12,6 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&
 function load(){try{return JSON.parse(localStorage.getItem(KEY)||"[]")}catch{return[]}}
 function save(){localStorage.setItem(KEY,JSON.stringify(bets));render()}
 
-function sampleBets(){
- const data=[
-  ['2026-06-04T19:45','Bet365','Arsenal','Arsenal v Chelsea','Premier League','Match Result',1.72,10,'Win'],
-  ['2026-06-07T16:30','Sky Bet','Liverpool','Liverpool v Newcastle','Premier League','Match Result',1.55,12,'Win'],
-  ['2026-06-10T20:00','Bet365','Man City','Man City v Spurs','Premier League','Match Result',1.48,10,'Win'],
-  ['2026-06-13T15:00','William Hill','Chelsea','Chelsea v Brighton','Premier League','Match Result',2.05,10,'Loss'],
-  ['2026-06-17T20:00','Bet365','Liverpool','Liverpool v Everton','Premier League','Match Result',1.62,15,'Win'],
-  ['2026-06-20T17:30','Sky Bet','Arsenal','Arsenal v Villa','Premier League','Match Result',1.80,10,'Win'],
-  ['2026-06-24T19:45','Bet365','BTTS — Yes','Chelsea v Newcastle','Premier League','Both Teams To Score',1.70,10,'Win'],
-  ['2026-06-27T15:00','Bet365','BTTS — Yes','Brighton v Wolves','Premier League','Both Teams To Score',1.75,10,'Loss'],
-  ['2026-06-30T20:00','Sky Bet','BTTS — Yes','Everton v Spurs','Premier League','Both Teams To Score',1.68,10,'Loss'],
-  ['2026-07-03T20:00','Bet365','BTTS — Yes','Villa v Chelsea','Premier League','Both Teams To Score',1.73,10,'Loss'],
-  ['2026-07-06T20:00','Bet365','Over 2.5','Barcelona v Real Madrid','La Liga','Over/Under 2.5',1.65,10,'Win'],
-  ['2026-07-09T18:00','Sky Bet','Over 2.5','Sevilla v Valencia','La Liga','Over/Under 2.5',1.80,10,'Loss'],
-  ['2026-07-12T20:00','Bet365','Over 2.5','Atletico v Betis','La Liga','Over/Under 2.5',1.72,10,'Win'],
-  ['2026-07-16T19:45','William Hill','Draw','Leicester v Leeds','Championship','Match Result',3.10,8,'Loss'],
-  ['2026-07-20T15:00','Bet365','BTTS — Yes','Norwich v Watford','Championship','Both Teams To Score',1.82,10,'Win'],
-  ['2026-07-24T19:45','Sky Bet','BTTS — Yes','Coventry v Derby','Championship','Both Teams To Score',1.78,10,'Loss'],
-  ['2026-08-02T20:00','Bet365','Over 2.5','Bayern v Dortmund','Bundesliga','Over/Under 2.5',1.60,10,'Win'],
-  ['2026-08-06T19:45','Sky Bet','Over 2.5','Leverkusen v Mainz','Bundesliga','Over/Under 2.5',1.70,10,'Loss'],
-  ['2026-08-10T20:00','Bet365','Home Win','Barcelona v Sevilla','La Liga','Match Result',1.42,15,'Win'],
-  ['2026-08-14T20:00','Bet365','Home Win','Real Madrid v Valencia','La Liga','Match Result',1.35,15,'Win'],
-  ['2026-08-18T20:00','Sky Bet','Over 2.5','PSG v Lyon','Champions League','Over/Under 2.5',1.65,10,'Win'],
-  ['2026-08-22T20:00','Bet365','Home Win','Bayern v Inter','Champions League','Match Result',1.75,10,'Win'],
-  ['2026-09-03T19:45','Bet365','BTTS — Yes','West Ham v Fulham','Premier League','Both Teams To Score',1.72,10,'Win'],
-  ['2026-09-07T20:00','Sky Bet','Over 2.5','Juventus v Napoli','Champions League','Over/Under 2.5',1.80,10,'Win'],
-  ['2026-09-09T20:00','Bet365','Home Win','Liverpool v Palace','Premier League','Match Result',1.60,10,'Pending']
- ];
- return data.map(([date,bookmaker,selection,event,league,market,odds,stake,status])=>({id:crypto.randomUUID(),date,bookmaker,selection,event,league,market,odds,stake,status,returns:status==='Win'?stake*odds:status==='Void'?stake:0,notes:'TEST SAMPLE'}));
-}
-function updateSampleButton(){
- const btn=$("sampleDataBtn");
- if(!btn)return;
- const has=bets.some(b=>b.notes==='TEST SAMPLE');
- btn.textContent=has?'🧪 Remove Samples':'🧪 Load Samples';
- btn.classList.toggle('sample-loaded',has);
-}
-function loadOrRemoveSamples(){
- if(bets.some(b=>b.notes==='TEST SAMPLE')){
-  bets=bets.filter(b=>b.notes!=='TEST SAMPLE');
- }else{
-  bets=bets.concat(sampleBets());
- }
- save();
- updateSampleButton();
-}
-
 function calc(b){
   const stake=+b.stake||0, odds=+b.odds||0;
   let ret=+b.returns||0;
@@ -104,7 +57,7 @@ function render(){
  const hp=(id,val,cls)=>{const el=$(id);if(el){el.textContent=val;if(cls)el.className=cls}};
  hp("historyKpiBets",s.bets);hp("historyKpiWin",pct(s.win));hp("historyKpiStake",money(s.stake));hp("historyKpiReturns",money(s.ret));hp("historyKpiProfit",money(s.pl),s.pl>=0?"positive":"negative");hp("historyKpiRoi",pct(s.roi));hp("historyKpiAvgOdds",s.avg.toFixed(2));
  hp("dashKpiBets",s.bets);hp("dashKpiWin",pct(s.win));hp("dashKpiStake",money(s.stake));hp("dashKpiReturns",money(s.ret));hp("dashKpiProfit",money(s.pl),s.pl>=0?"positive":"negative");hp("dashKpiRoi",pct(s.roi));hp("dashKpiAvgOdds",s.avg.toFixed(2));
- renderHistory();renderHistoryChart();renderDashLists();renderAnalytics();renderCharts();updateSampleButton();
+ renderHistory();renderHistoryChart();renderDashLists();renderAnalytics();renderCharts();
 }
 function filtered(){
  const q=$("search").value.toLowerCase(), st=$("filterStatus").value, ma=$("filterMarket").value.toLowerCase(), le=$("filterLeague").value.toLowerCase(), from=$("filterFrom").value, to=$("filterTo").value;
@@ -555,7 +508,7 @@ $("saveOcr").onclick=()=>{
  const b={id:crypto.randomUUID(),date:$("ocrDate").value,bookmaker:$("ocrBookmaker").value,selection:$("ocrSelection").value,event:$("ocrEvent").value,league:$("ocrLeague").value,market:$("ocrMarket").value,odds:+$("ocrOdds").value,stake:+$("ocrStake").value,status:$("ocrStatusSelect").value,returns:+$("ocrReturns").value||0,notes:"Imported from screenshot"};
  if(!b.selection||!b.odds||!b.stake){alert("Please fill in selection, odds and stake.");return}bets.push(b);save();showTab("dashboard");$("ocrStatus").textContent="Saved.";};
 
-$("sampleDataBtn")?.addEventListener("click",loadOrRemoveSamples);
+
 
 document.addEventListener("click",e=>{
  const btn=e.target.closest("[data-league-market-metric]");
