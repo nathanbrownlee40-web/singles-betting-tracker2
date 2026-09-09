@@ -236,26 +236,77 @@ function renderHistoryChart(){
  try{
   const el=$("historyPlChart");
   if(!el || typeof Chart==="undefined") return;
-  const rows=filtered().filter(b=>b.status!=="Pending").slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
-  let run=0;
-  const labels=rows.map(b=>fmtDate(b.date));
-  const data=rows.map(b=>{run+=calc(b).pl;return +run.toFixed(2)});
+  const rows=filtered().filter(b=>b.status!=="Pending").slice();
   if(historyChart) historyChart.destroy();
+
+  // One point per betting day. Each day is calculated independently, then
+  // cumulative P/L is built across the filtered days in chronological order.
+  const dayMap={};
+  rows.forEach(b=>{
+   const day=String(b.date||"").slice(0,10);
+   if(!day) return;
+   if(!dayMap[day]) dayMap[day]={date:day,pl:0,stake:0,bets:0};
+   const c=calc(b);
+   dayMap[day].pl+=c.pl;
+   dayMap[day].stake+=c.stake;
+   dayMap[day].bets++;
+  });
+  const days=Object.values(dayMap).sort((a,b)=>a.date.localeCompare(b.date));
+  let run=0;
+  days.forEach(d=>{run+=d.pl;d.cumulative=+run.toFixed(2);d.pl=+d.pl.toFixed(2);d.stake=+d.stake.toFixed(2)});
+
+  const labels=days.map(d=>{
+   const dt=new Date(d.date+"T12:00:00");
+   return dt.toLocaleDateString("en-GB",{day:"numeric",month:"short"});
+  });
+  const data=days.map(d=>d.cumulative);
+  const empty=$("historyChartEmpty");
+  if(empty) empty.classList.toggle("hidden",days.length>0);
+  if(!days.length) return;
+
   historyChart=new Chart(el,{type:"line",data:{labels,datasets:[{
-    label:"Cumulative P/L",data,borderWidth:3,tension:.35,pointRadius:3,pointHoverRadius:6,
-    fill:true
+    label:"Cumulative P/L",data,borderWidth:3,tension:.28,pointRadius:5,pointHoverRadius:8,
+    pointHitRadius:14,fill:false
   }]},options:{
     responsive:true,maintainAspectRatio:false,
-    interaction:{mode:"index",intersect:false},
-    plugins:{legend:{display:true,position:"top"},tooltip:{callbacks:{label:c=>" P/L: £"+Number(c.parsed.y||0).toFixed(2)}}},
-    scales:{x:{grid:{display:false},ticks:{color:"#91a0ba",maxTicksLimit:10}},
-      y:{beginAtZero:false,grid:{color:"rgba(145,160,186,.14)"},ticks:{color:"#91a0ba",callback:v=>"£"+Number(v).toFixed(0)}}}
+    interaction:{mode:"nearest",intersect:true},
+    onClick:(event,elements)=>{
+      if(!elements.length)return;
+      const d=days[elements[0].index];
+      showHistoryDay(d);
+    },
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{
+        title:items=>items.length?`Betting day: ${days[items[0].dataIndex].date}`:"",
+        label:ctx=>{
+          const d=days[ctx.dataIndex];
+          return [
+            `Day P/L: ${money(d.pl)}`,
+            `Cumulative P/L: ${money(d.cumulative)}`,
+            `Bets: ${d.bets}`,
+            `Stake: ${money(d.stake)}`
+          ];
+        },
+        afterBody:()=>"Tap/click the point for full details"
+      }}
+    },
+    scales:{
+      x:{grid:{display:false},ticks:{maxTicksLimit:12,color:"#91a0ba",autoSkip:true}},
+      y:{title:{display:true,text:"P/L (£)",color:"#91a0ba"},grid:{color:"rgba(145,160,186,.14)"},ticks:{color:"#91a0ba",callback:v=>money(v)}}
+    }
   }});
-  const empty=$("historyChartEmpty");
-  if(empty) empty.classList.toggle("hidden",rows.length>0);
  }catch(err){console.warn("History chart error:",err)}
 }
 
+function showHistoryDay(d){
+ const dt=new Date(d.date+"T12:00:00");
+ const label=dt.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+ const existing=$("historyDayDetails");
+ const html=`<div class="history-day-details-head"><div><span class="eyebrow">BETTING DAY</span><strong>${esc(label)}</strong></div><button type="button" class="secondary mini" id="closeHistoryDay">Close</button></div>
+ <div class="history-day-stats"><div><span>Day P/L</span><strong class="${d.pl>=0?"positive":"negative"}">${money(d.pl)}</strong></div><div><span>Cumulative P/L</span><strong class="${d.cumulative>=0?"positive":"negative"}">${money(d.cumulative)}</strong></div><div><span>Number of bets</span><strong>${d.bets}</strong></div><div><span>Stake</span><strong>${money(d.stake)}</strong></div></div>`;
+ if(existing){existing.innerHTML=html;existing.classList.remove("hidden");$("closeHistoryDay").onclick=()=>existing.classList.add("hidden");}
+}
 function resetForm(){
  $("betId").value="";$("formTitle").textContent="Add a bet";$("betForm").reset();
  $("date").value=new Date().toISOString().slice(0,16);
@@ -388,23 +439,37 @@ $("saveOcr").onclick=()=>{
 resetForm();setupAnalyticsTabs();render();
 
 let deferredInstallPrompt=null;
+const installBtn=$("installPwa");
+function isStandalone(){return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone===true}
+function updateInstallButton(){
+ if(!installBtn)return;
+ if(isStandalone()){
+   installBtn.classList.add("hidden");
+   return;
+ }
+ installBtn.classList.remove("hidden");
+ installBtn.textContent=deferredInstallPrompt?"📱 Install App":"📱 Install App";
+}
 window.addEventListener("beforeinstallprompt",e=>{
  e.preventDefault();
  deferredInstallPrompt=e;
- const btn=$("installPwa");
- if(btn) btn.classList.remove("hidden");
+ updateInstallButton();
 });
 window.addEventListener("appinstalled",()=>{
  deferredInstallPrompt=null;
- const btn=$("installPwa");
- if(btn){btn.classList.add("hidden");btn.textContent="Installed ✓";}
+ updateInstallButton();
 });
-
-document.addEventListener("click",async e=>{
- if(e.target && e.target.id==="installPwa" && deferredInstallPrompt){
-   deferredInstallPrompt.prompt();
-   await deferredInstallPrompt.userChoice;
+installBtn?.addEventListener("click",async()=>{
+ if(isStandalone())return;
+ if(deferredInstallPrompt){
+   const prompt=deferredInstallPrompt;
    deferredInstallPrompt=null;
-   e.target.classList.add("hidden");
+   try{await prompt.prompt();await prompt.userChoice}catch(err){console.warn("Install prompt unavailable:",err)}
+   updateInstallButton();
+   return;
  }
+ // Android/Chrome can expose no prompt until the browser considers the site
+ // installable. Give the user the native fallback rather than doing nothing.
+ alert("To install the app, open your browser menu (⋮) and choose “Add to Home screen” or “Install app”. If you don't see that option yet, use the site normally for a little while and try again.");
 });
+updateInstallButton();

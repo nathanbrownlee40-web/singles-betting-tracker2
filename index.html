@@ -19,7 +19,7 @@
       <p>Track bets, P/L, ROI and what’s actually making you money.</p>
     </div>
     <div class="top-actions">
-      <button class="secondary hidden" id="installPwa">📱 Install App</button>
+      <button class="secondary" id="installPwa">📱 Install App</button>
       <button class="secondary" id="demoBtn">Load demo data</button>
       <button class="danger" id="clearBtn">Clear all</button>
     </div>
@@ -138,10 +138,11 @@
         </div>
         <div class="history-chart-panel">
           <div class="panel-head">
-            <div><h3>Profit & Loss</h3><p class="muted">Cumulative P/L from your settled bets. Filters below also update this graph.</p></div>
+            <div><h3>Profit & Loss</h3><p class="muted">One point per betting day. Tap a point to see that day’s P/L, cumulative P/L, stake and bets. Filters also update the graph.</p></div>
           </div>
           <div class="history-chart-wrap"><canvas id="historyPlChart"></canvas></div>
           <div id="historyChartEmpty" class="chart-empty hidden">Add or load settled bets to see your P/L line.</div>
+          <div id="historyDayDetails" class="history-day-details hidden" aria-live="polite"></div>
         </div>
         <div class="filters">
           <input id="search" placeholder="Search selection/event/league/market...">
