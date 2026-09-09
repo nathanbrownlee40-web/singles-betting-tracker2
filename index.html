@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="en">
 <head>
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0b1220">
+  <link rel="manifest" href="manifest.webmanifest">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Singles Betting Tracker</title>
@@ -191,5 +195,10 @@
 
   <footer>Singles Betting Tracker • Data is stored locally in this browser.</footer>
   <script src="app.js"></script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));
+}
+</script>
 </body>
 </html>

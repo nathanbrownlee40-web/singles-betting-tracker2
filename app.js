@@ -59,16 +59,36 @@ function listHTML(rows){
  return `<div class="stat-list">${rows.slice(0,6).map(x=>`<div class="stat-row"><span><b>${esc(x.name)}</b><br><small>${x.bets} bets • ${pct(x.roi)} ROI</small></span><strong class="${x.pl>=0?"positive":"negative"}">${money(x.pl)}</strong></div>`).join("")}</div>`;
 }
 function renderDashLists(){$("marketDash").innerHTML=listHTML(aggregate("market"));$("leagueDash").innerHTML=listHTML(aggregate("league"))}
-function tableHTML(rows,metric="roi"){
- if(!rows.length)return `<p class="muted">No settled data yet.</p>`;
- const label=metric==="win"?"Win %":"ROI";
- return `<div class="table-wrap"><table><thead><tr><th>Name</th><th>Bets</th><th>Stake</th><th>P/L</th><th>${label}</th><th>Win %</th></tr></thead><tbody>${rows.map(x=>{
-   const value=metric==="win"?x.win:x.roi;
-   const cls=metric==="win"?(value>=50?"metric-good":value<50?"metric-bad":"metric-neutral"):(value>0?"metric-good":value<0?"metric-bad":"metric-neutral");
-   return `<tr><td><b>${esc(x.name)}</b></td><td>${x.bets}</td><td>${money(x.stake)}</td><td class="${x.pl>=0?"positive":"negative"}">${money(x.pl)}</td><td class="${cls}">${pct(value)}</td><td>${pct(x.win)}</td></tr>`;
- }).join("")}</tbody></table></div>`
+function tableHTML(rows,metric){
+  if(!rows.length) return '<div class="empty">No settled bets yet.</div>';
+
+  const valueFor = r => metric === "win" ? r.win : r.roi;
+  const labelFor = r => metric === "win"
+    ? `${r.win.toFixed(0)}%`
+    : `${r.roi >= 0 ? "+" : ""}${r.roi.toFixed(0)}%`;
+
+  return `<div class="performance-bars">
+    ${rows.map(r => {
+      const value = valueFor(r);
+      const width = Math.max(4, Math.min(100, Math.abs(value)));
+      const cls = metric === "win"
+        ? (value >= 55 ? "metric-good" : value >= 45 ? "metric-neutral" : "metric-bad")
+        : (value > 0 ? "metric-good" : value < 0 ? "metric-bad" : "metric-neutral");
+
+      return `<div class="performance-row">
+        <div class="performance-name" title="${escapeHTML(r.name)}">${escapeHTML(r.name)}</div>
+        <div class="performance-main">
+          <div class="performance-track">
+            <div class="performance-fill ${cls}" style="width:${width}%"></div>
+          </div>
+          <div class="performance-value ${cls}">${labelFor(r)}</div>
+        </div>
+        <div class="performance-meta">${r.bets} bet${r.bets === 1 ? "" : "s"} · ${r.wins} win${r.wins === 1 ? "" : "s"}</div>
+      </div>`;
+    }).join("")}
+  </div>`;
 }
-const metricModes={market:"roi",selection:"roi",league:"roi",odds:"roi"};
+
 function renderAnalytics(){
  const markets=aggregate("market"), selections=aggregate("selection"), leagues=aggregate("league");
  $("marketTable").innerHTML=tableHTML(markets,metricModes.market);
