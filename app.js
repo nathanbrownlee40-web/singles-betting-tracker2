@@ -660,6 +660,17 @@ function isStandalone(){return window.matchMedia("(display-mode: standalone)").m
 function updateInstallButton(){if(!installBtn)return;if(isStandalone()){installBtn.classList.add("hidden");return}installBtn.classList.remove("hidden");installBtn.textContent=deferredInstallPrompt?"📱 Install App":"📱 Install App"}
 window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstallPrompt=e;updateInstallButton()});
 window.addEventListener("appinstalled",()=>{deferredInstallPrompt=null;updateInstallButton()});
+function showInstallHelp(){
+  const msg=[
+    "Chrome has not exposed the native install prompt to this page yet.",
+    "",
+    "On Android Chrome, open ⋮ and choose Install app (or Add to Home screen).",
+    "If Chrome offers Install app there, use that option — it installs the PWA directly.",
+    "",
+    "If that option is missing too, Chrome is currently withholding installation for this site; the website cannot force the browser's native prompt."
+  ].join("\n");
+  alert(msg);
+}
 installBtn?.addEventListener("click",async()=>{
   if(isStandalone())return;
   if(deferredInstallPrompt){
@@ -672,6 +683,6 @@ installBtn?.addEventListener("click",async()=>{
     updateInstallButton();
     return;
   }
-  alert("Chrome hasn't made the in-app install prompt available yet. Try Chrome ⋮ → Install app (or Add to Home screen). If Install app is not shown yet, reload this page after a few seconds and try again.");
+  showInstallHelp();
 });
 updateInstallButton();
