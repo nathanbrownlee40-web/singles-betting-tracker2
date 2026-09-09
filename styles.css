@@ -210,7 +210,27 @@ body.view-mobile .history-month-panel[open] #monthlyHistoryBreakdown{padding:0 1
 .history-month-table tr.month-negative td:first-child{border-left:3px solid rgba(255,109,125,.75)}
 .history-month-table tr.month-positive td,.history-month-table tr.month-negative td,.history-month-table tr.month-neutral td{border-bottom-color:#26324c}
 
-/* v24: keep uploaded betting screenshots compact inside the importer */
+/* v25: keep uploaded betting screenshots compact inside the importer */
 #ocrPreview{width:100%;max-width:100%;overflow:hidden}
 #ocrPreview img{display:block;width:auto;max-width:100%;height:auto;max-height:260px;object-fit:contain;border-radius:10px;margin:10px auto}
 @media(max-width:700px){#ocrPreview img{max-height:220px}}
+
+
+/* v25: subtle status styling for betting cards */
+.bet-card{position:relative;overflow:hidden}
+.bet-card-win{background:linear-gradient(145deg,rgba(28,122,82,.13),#0b1324 42%);border-color:rgba(97,214,155,.28);box-shadow:inset 3px 0 0 rgba(97,214,155,.75),0 8px 25px #0002}
+.bet-card-loss{background:linear-gradient(145deg,rgba(155,45,65,.13),#0b1324 42%);border-color:rgba(255,109,125,.28);box-shadow:inset 3px 0 0 rgba(255,109,125,.75),0 8px 25px #0002}
+.bet-card-pending{background:linear-gradient(145deg,rgba(187,126,35,.12),#0b1324 42%);border-color:rgba(241,201,107,.26);box-shadow:inset 3px 0 0 rgba(241,201,107,.72),0 8px 25px #0002}
+.bet-card-void{background:linear-gradient(145deg,rgba(130,140,160,.08),#0b1324 42%);border-color:rgba(170,179,197,.22);box-shadow:inset 3px 0 0 rgba(170,179,197,.45),0 8px 25px #0002}
+.bet-selection{letter-spacing:.01em}
+.bet-selection.win{color:#61d69b!important}
+.bet-selection.loss{color:#ff6d7d!important}
+.bet-selection.pending{color:#f1c96b!important}
+.bet-selection.void{color:#c5cbd6!important}
+.bet-card-top small{color:#b5bfd2}
+.bet-card-meta span{background:rgba(25,38,62,.72);border:1px solid rgba(70,88,120,.22)}
+
+/* v25: show uploaded screenshots larger without stretching or distorting them */
+#ocrPreview{width:100%;display:flex;justify-content:center;align-items:center;overflow:hidden;padding:4px 0 8px}
+#ocrPreview img{display:block;width:min(100%,560px);height:auto;max-width:100%;max-height:560px;object-fit:contain;border-radius:10px;margin:10px auto}
+@media(max-width:700px){#ocrPreview img{width:100%;max-width:100%;max-height:560px}}

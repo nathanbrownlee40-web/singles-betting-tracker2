@@ -207,8 +207,9 @@ function listHTML(rows){
 }
 function betCardHTML(b, showStatus=true){
  const c=calc(b);
- return `<div class="bet-card">
-   <div class="bet-card-top"><div><strong>${esc(b.selection||"—")}</strong><small>${esc(b.event||b.market||"No event")}</small></div><span class="bet-status ${String(b.status||"").toLowerCase()}">${esc(b.status||"")}</span></div>
+ const statusClass=String(b.status||"").toLowerCase();
+ return `<div class="bet-card bet-card-${statusClass}">
+   <div class="bet-card-top"><div><strong class="bet-selection ${statusClass}">${esc(b.selection||"—")}</strong><small>${esc(b.event||b.market||"No event")}</small></div><span class="bet-status ${statusClass}">${esc(b.status||"")}</span></div>
    <div class="bet-card-meta"><span>${esc(b.market||"Market not set")}</span><span>${esc(b.league||"League not set")}</span><span>@ ${(+b.odds||0).toFixed(2)}</span><span>Stake ${money(c.stake)}</span></div>
    ${b.status!=="Pending"?`<div class="bet-card-bottom"><span>${fmtDate(b.date)}</span><strong class="${c.pl>=0?"positive":"negative"}">${c.pl>=0?"+":""}${money(c.pl)}</strong></div>`:`<div class="bet-card-bottom"><span>${fmtDate(b.date)}</span><strong>Potential ${money(c.ret)}</strong></div>`}
  </div>`;
@@ -443,13 +444,20 @@ function parseOCRBet(text){
  const lines=text.split("\n").map(x=>x.trim()).filter(Boolean);
  const joined=lines.join(" ");
  let selection="", odds="";
+ const selectionFrom=(m)=>m?`${m[1][0].toUpperCase()+m[1].slice(1).toLowerCase()} ${m[2]}`:"";
  for(const line of lines){
-   const m=line.match(/(?:^|[^a-z])(over|under)\s*(\d+(?:\.\d+)?)\s+(\d+\.\d{1,2})(?:\b|$)/i);
-   if(m){selection=`${m[1][0].toUpperCase()+m[1].slice(1).toLowerCase()} ${m[2]}`;odds=+m[3];break;}
+   const m=line.match(/\b(over|under)\s*(\d+(?:\.\d+)?)(?:\s+|\s*@\s*)(\d+(?:\.\d{1,2})?)\b/i);
+   if(m){selection=selectionFrom(m);odds=+m[3];break;}
  }
  if(!selection){
-   const m=joined.match(/\b(over|under)\s*(\d+(?:\.\d+)?)\s*(?:@\s*)?(\d+\.\d{1,2})\b/i);
-   if(m){selection=`${m[1][0].toUpperCase()+m[1].slice(1).toLowerCase()} ${m[2]}`;odds=+m[3];}
+   const m=joined.match(/\b(over|under)\s*(\d+(?:\.\d+)?)(?:\s*@\s*(\d+(?:\.\d{1,2})?))?/i);
+   if(m)selection=selectionFrom(m);
+ }
+ if(!odds && selection){
+   const idx=lines.findIndex(l=>l.toLowerCase().includes(selection.toLowerCase()));
+   const nearby=(idx>=0?lines.slice(idx,Math.min(lines.length,idx+3)).join(" "):joined);
+   const om=nearby.match(/(?:^|\s|@)(\d+\.\d{1,2})(?=\s|$)/);
+   if(om)odds=+om[1];
  }
  let market=firstMatch(text,[
    /\b(total cards|total corners|total goals|both teams to score|double chance|draw no bet|match result|over\/under|corners)\b/i
@@ -489,6 +497,31 @@ function parseOCRBet(text){
  else if(/\b(void|voided|push)\b/i.test(joined))status="Void";
  return {bookmaker,selection,event,league,market,odds,stake,status,returns,text};
 }
+async function prepareOCRImage(file){
+ return new Promise((resolve,reject)=>{
+   const img=new Image();
+   const url=URL.createObjectURL(file);
+   img.onload=()=>{
+     URL.revokeObjectURL(url);
+     const scale=Math.min(2,2400/Math.max(img.naturalWidth,img.naturalHeight));
+     const canvas=document.createElement("canvas");
+     canvas.width=Math.round(img.naturalWidth*scale);canvas.height=Math.round(img.naturalHeight*scale);
+     const ctx=canvas.getContext("2d",{willReadFrequently:true});
+     ctx.drawImage(img,0,0,canvas.width,canvas.height);
+     const data=ctx.getImageData(0,0,canvas.width,canvas.height);
+     for(let i=0;i<data.data.length;i+=4){
+       const r=data.data[i],g=data.data[i+1],b=data.data[i+2];
+       const y=(0.299*r+0.587*g+0.114*b);
+       const boosted=Math.max(0,Math.min(255,(y-128)*1.35+128));
+       data.data[i]=data.data[i+1]=data.data[i+2]=boosted;
+     }
+     ctx.putImageData(data,0,0);
+     canvas.toBlob(blob=>blob?resolve(blob):reject(new Error("OCR image preparation failed")),"image/png");
+   };
+   img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("Could not load screenshot"))};
+   img.src=url;
+ });
+}
 $("screenshot").onchange=async e=>{
  const file=e.target.files[0];if(!file)return;
  $("ocrStatus").textContent="Reading screenshot…";
@@ -496,7 +529,8 @@ $("screenshot").onchange=async e=>{
  $("ocrPreview").innerHTML=`<img src="${previewUrl}" alt="Betting screenshot">`;
  $("ocrFields").classList.remove("hidden");$("saveOcr").classList.remove("hidden");
  try{
-  const result=await Tesseract.recognize(file,"eng",{logger:m=>{
+  const ocrImage=await prepareOCRImage(file);
+  const result=await Tesseract.recognize(ocrImage,"eng",{logger:m=>{
    if(m.status==="recognizing text")$("ocrStatus").textContent=`Reading screenshot… ${Math.round((m.progress||0)*100)}%`;
   }});
   const text=cleanOCRText(result.data.text);
