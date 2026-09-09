@@ -53,10 +53,8 @@ function streak(){
 }
 function render(){
  const s=totalStats();
- $("kpiBets").textContent=s.bets;$("kpiStake").textContent=money(s.stake);$("kpiReturns").textContent=money(s.ret);
- $("kpiProfit").textContent=money(s.pl);$("kpiProfit").className=s.pl>=0?"positive":"negative";
- $("kpiRoi").textContent=pct(s.roi);$("kpiWin").textContent=pct(s.win);$("kpiOdds").textContent=s.avg.toFixed(2);
- $("kpiStreak").textContent=streak();
+ const hp=(id,val,cls)=>{const el=$(id);if(el){el.textContent=val;if(cls)el.className=cls}};
+ hp("historyKpiBets",s.bets);hp("historyKpiWin",pct(s.win));hp("historyKpiStake",money(s.stake));hp("historyKpiReturns",money(s.ret));hp("historyKpiProfit",money(s.pl),s.pl>=0?"positive":"negative");hp("historyKpiRoi",pct(s.roi));
  renderHistory();renderHistoryChart();renderDashLists();renderAnalytics();renderCharts();
 }
 function filtered(){
@@ -132,7 +130,22 @@ function listHTML(rows){
  if(!rows.length)return `<p class="muted">No settled data yet.</p>`;
  return `<div class="stat-list">${rows.slice(0,6).map(x=>`<div class="stat-row"><span><b>${esc(x.name)}</b><br><small>${x.bets} bets • ${pct(x.roi)} ROI</small></span><strong class="${x.pl>=0?"positive":"negative"}">${money(x.pl)}</strong></div>`).join("")}</div>`;
 }
-function renderDashLists(){$("marketDash").innerHTML=listHTML(aggregate("market"));$("leagueDash").innerHTML=listHTML(aggregate("league"))}
+function betCardHTML(b, showStatus=true){
+ const c=calc(b);
+ return `<div class="bet-card">
+   <div class="bet-card-top"><div><strong>${esc(b.selection||"—")}</strong><small>${esc(b.event||b.market||"No event")}</small></div><span class="bet-status ${String(b.status||"").toLowerCase()}">${esc(b.status||"")}</span></div>
+   <div class="bet-card-meta"><span>${esc(b.market||"Market not set")}</span><span>${esc(b.league||"League not set")}</span><span>@ ${(+b.odds||0).toFixed(2)}</span><span>Stake ${money(c.stake)}</span></div>
+   ${b.status!=="Pending"?`<div class="bet-card-bottom"><span>${fmtDate(b.date)}</span><strong class="${c.pl>=0?"positive":"negative"}">${c.pl>=0?"+":""}${money(c.pl)}</strong></div>`:`<div class="bet-card-bottom"><span>${fmtDate(b.date)}</span><strong>Potential ${money(c.ret)}</strong></div>`}
+ </div>`;
+}
+function renderDashLists(){
+ const open=bets.filter(b=>b.status==="Pending").slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+ const recent=bets.filter(b=>b.status!=="Pending").slice().sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,3);
+ const openEl=$("openBetsDash"), recentEl=$("recentResultsDash"), count=$("openBetCount");
+ if(count)count.textContent=open.length;
+ if(openEl)openEl.innerHTML=open.length?open.slice(0,6).map(betCardHTML).join(""):`<div class="dashboard-empty">No open bets right now.</div>`;
+ if(recentEl)recentEl.innerHTML=recent.length?recent.map(betCardHTML).join(""):`<div class="dashboard-empty">No settled results yet.</div>`;
+}
 function tableHTML(rows,metric){
   if(!rows.length) return '<div class="empty">No settled bets yet.</div>';
 
@@ -232,81 +245,32 @@ function draw(id,type,labels,data,label){
  }catch(err){console.warn("Chart error:",err)}
 }
 
+function showHistoryDay(d){
+ const el=$("historyDayDetails");if(!el)return;
+ const sign=d.pl>=0?"+":"";
+ el.classList.remove("hidden","positive","negative");el.classList.add(d.pl>=0?"positive":"negative");
+ el.innerHTML=`<div class="history-day-head"><div><b>${esc(d.label)}</b><small>${d.bets} bet${d.bets===1?"":"s"}</small></div><button class="mini secondary" id="closeHistoryDay">Close</button></div><div class="history-day-grid"><div><span>Day P/L</span><strong>${sign}${money(d.pl)}</strong></div><div><span>Cumulative P/L</span><strong>${d.cumulative>=0?"+":""}${money(d.cumulative)}</strong></div><div><span>Stake</span><strong>${money(d.stake)}</strong></div><div><span>Bets</span><strong>${d.bets}</strong></div></div>`;
+ $("closeHistoryDay")?.addEventListener("click",()=>el.classList.add("hidden"));
+}
 function renderHistoryChart(){
  try{
-  const el=$("historyPlChart");
-  if(!el || typeof Chart==="undefined") return;
-  const rows=filtered().filter(b=>b.status!=="Pending").slice();
-  if(historyChart) historyChart.destroy();
-
-  // One point per betting day. Each day is calculated independently, then
-  // cumulative P/L is built across the filtered days in chronological order.
-  const dayMap={};
-  rows.forEach(b=>{
-   const day=String(b.date||"").slice(0,10);
-   if(!day) return;
-   if(!dayMap[day]) dayMap[day]={date:day,pl:0,stake:0,bets:0};
-   const c=calc(b);
-   dayMap[day].pl+=c.pl;
-   dayMap[day].stake+=c.stake;
-   dayMap[day].bets++;
-  });
-  const days=Object.values(dayMap).sort((a,b)=>a.date.localeCompare(b.date));
-  let run=0;
-  days.forEach(d=>{run+=d.pl;d.cumulative=+run.toFixed(2);d.pl=+d.pl.toFixed(2);d.stake=+d.stake.toFixed(2)});
-
-  const labels=days.map(d=>{
-   const dt=new Date(d.date+"T12:00:00");
-   return dt.toLocaleDateString("en-GB",{day:"numeric",month:"short"});
-  });
+  const el=$("historyPlChart");if(!el || typeof Chart==="undefined")return;
+  const rows=filtered().filter(b=>b.status!=="Pending");
+  const byDay={};
+  rows.forEach(b=>{const key=String(b.date).slice(0,10);if(!byDay[key])byDay[key]={date:key,pl:0,stake:0,bets:0};const c=calc(b);byDay[key].pl+=c.pl;byDay[key].stake+=c.stake;byDay[key].bets++;});
+  const days=Object.values(byDay).sort((a,b)=>a.date.localeCompare(b.date));
+  let run=0;days.forEach(d=>{run+=d.pl;d.cumulative=+run.toFixed(2);d.pl=+d.pl.toFixed(2);d.stake=+d.stake.toFixed(2);});
+  const labels=days.map(d=>d.date);
   const data=days.map(d=>d.cumulative);
-  const empty=$("historyChartEmpty");
-  if(empty) empty.classList.toggle("hidden",days.length>0);
-  if(!days.length) return;
-
-  historyChart=new Chart(el,{type:"line",data:{labels,datasets:[{
-    label:"Cumulative P/L",data,borderWidth:3,tension:.28,pointRadius:5,pointHoverRadius:8,
-    pointHitRadius:14,fill:false
-  }]},options:{
-    responsive:true,maintainAspectRatio:false,
-    interaction:{mode:"nearest",intersect:true},
-    onClick:(event,elements)=>{
-      if(!elements.length)return;
-      const d=days[elements[0].index];
-      showHistoryDay(d);
-    },
-    plugins:{
-      legend:{display:false},
-      tooltip:{callbacks:{
-        title:items=>items.length?`Betting day: ${days[items[0].dataIndex].date}`:"",
-        label:ctx=>{
-          const d=days[ctx.dataIndex];
-          return [
-            `Day P/L: ${money(d.pl)}`,
-            `Cumulative P/L: ${money(d.cumulative)}`,
-            `Bets: ${d.bets}`,
-            `Stake: ${money(d.stake)}`
-          ];
-        },
-        afterBody:()=>"Tap/click the point for full details"
-      }}
-    },
-    scales:{
-      x:{grid:{display:false},ticks:{maxTicksLimit:12,color:"#91a0ba",autoSkip:true}},
-      y:{title:{display:true,text:"P/L (£)",color:"#91a0ba"},grid:{color:"rgba(145,160,186,.14)"},ticks:{color:"#91a0ba",callback:v=>money(v)}}
-    }
-  }});
+  if(historyChart)historyChart.destroy();
+  const current=days.length?days[days.length-1].cumulative:0;
+  const currentText=current>=0?`Current profit +${money(current)}`:`Current loss -${money(Math.abs(current))}`;
+  const endLabelPlugin={id:"historyEndLabel",afterDatasetsDraw(chart){if(!days.length)return;const meta=chart.getDatasetMeta(0),pt=meta.data[meta.data.length-1];if(!pt)return;const ctx=chart.ctx;ctx.save();ctx.font="700 12px system-ui";ctx.textAlign="right";ctx.fillStyle=current>=0?"#61d69b":"#ff6d7d";ctx.fillText(currentText,pt.x,pt.y-12);ctx.restore();}};
+  historyChart=new Chart(el,{type:"line",data:{labels,datasets:[{label:"Cumulative P/L",data,borderWidth:3,tension:.35,pointRadius:5,pointHoverRadius:8,hitRadius:14,fill:true}]},plugins:[endLabelPlugin],options:{responsive:true,maintainAspectRatio:false,interaction:{mode:"nearest",intersect:true},onClick:(evt,elements)=>{if(!elements.length)return;const i=elements[0].index;showHistoryDay(days[i]);},plugins:{legend:{display:true,position:"top"},tooltip:{callbacks:{title:items=>days[items[0].dataIndex]?`Betting day: ${fmtDate(days[items[0].dataIndex].date)}`:"",label:c=>{const d=days[c.dataIndex];return [`Day P/L: ${d.pl>=0?"+":""}${money(d.pl)}`,`Cumulative P/L: ${d.cumulative>=0?"+":""}${money(d.cumulative)}`,`Bets: ${d.bets}`,`Stake: ${money(d.stake)}`]}}}},scales:{x:{grid:{display:false},ticks:{color:"#91a0ba",maxTicksLimit:12,autoSkip:true,callback:function(value,index){const key=labels[index];if(!key)return "";const prev=labels[index-1];return !prev||key.slice(0,7)!==prev.slice(0,7)?new Date(key+"T12:00:00").toLocaleDateString("en-GB",{month:"short"}):"";}}},y:{beginAtZero:false,grid:{color:"rgba(145,160,186,.14)"},ticks:{color:"#91a0ba",callback:v=>money(v)}}}}});
+  const empty=$("historyChartEmpty");if(empty)empty.classList.toggle("hidden",days.length>0);
  }catch(err){console.warn("History chart error:",err)}
 }
 
-function showHistoryDay(d){
- const dt=new Date(d.date+"T12:00:00");
- const label=dt.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
- const existing=$("historyDayDetails");
- const html=`<div class="history-day-details-head"><div><span class="eyebrow">BETTING DAY</span><strong>${esc(label)}</strong></div><button type="button" class="secondary mini" id="closeHistoryDay">Close</button></div>
- <div class="history-day-stats"><div><span>Day P/L</span><strong class="${d.pl>=0?"positive":"negative"}">${money(d.pl)}</strong></div><div><span>Cumulative P/L</span><strong class="${d.cumulative>=0?"positive":"negative"}">${money(d.cumulative)}</strong></div><div><span>Number of bets</span><strong>${d.bets}</strong></div><div><span>Stake</span><strong>${money(d.stake)}</strong></div></div>`;
- if(existing){existing.innerHTML=html;existing.classList.remove("hidden");$("closeHistoryDay").onclick=()=>existing.classList.add("hidden");}
-}
 function resetForm(){
  $("betId").value="";$("formTitle").textContent="Add a bet";$("betForm").reset();
  $("date").value=new Date().toISOString().slice(0,16);
@@ -441,35 +405,8 @@ resetForm();setupAnalyticsTabs();render();
 let deferredInstallPrompt=null;
 const installBtn=$("installPwa");
 function isStandalone(){return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone===true}
-function updateInstallButton(){
- if(!installBtn)return;
- if(isStandalone()){
-   installBtn.classList.add("hidden");
-   return;
- }
- installBtn.classList.remove("hidden");
- installBtn.textContent=deferredInstallPrompt?"📱 Install App":"📱 Install App";
-}
-window.addEventListener("beforeinstallprompt",e=>{
- e.preventDefault();
- deferredInstallPrompt=e;
- updateInstallButton();
-});
-window.addEventListener("appinstalled",()=>{
- deferredInstallPrompt=null;
- updateInstallButton();
-});
-installBtn?.addEventListener("click",async()=>{
- if(isStandalone())return;
- if(deferredInstallPrompt){
-   const prompt=deferredInstallPrompt;
-   deferredInstallPrompt=null;
-   try{await prompt.prompt();await prompt.userChoice}catch(err){console.warn("Install prompt unavailable:",err)}
-   updateInstallButton();
-   return;
- }
- // Android/Chrome can expose no prompt until the browser considers the site
- // installable. Give the user the native fallback rather than doing nothing.
- alert("To install the app, open your browser menu (⋮) and choose “Add to Home screen” or “Install app”. If you don't see that option yet, use the site normally for a little while and try again.");
-});
+function updateInstallButton(){if(!installBtn)return;if(isStandalone()){installBtn.classList.add("hidden");return}installBtn.classList.remove("hidden");installBtn.textContent="📱 Install App"}
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstallPrompt=e;updateInstallButton()});
+window.addEventListener("appinstalled",()=>{deferredInstallPrompt=null;updateInstallButton()});
+installBtn?.addEventListener("click",async()=>{if(isStandalone())return;if(deferredInstallPrompt){const prompt=deferredInstallPrompt;deferredInstallPrompt=null;try{await prompt.prompt();await prompt.userChoice}catch(err){console.warn("Install prompt unavailable:",err)}updateInstallButton();return}alert("The install prompt is not available yet. Chrome may show Install App in its normal menu once the site meets its install requirements.")});
 updateInstallButton();

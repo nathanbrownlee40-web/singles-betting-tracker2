@@ -35,40 +35,14 @@
 
   <main>
     <section id="dashboard" class="tab-panel active">
-      <div class="kpis">
-        <div class="card"><span>Total Bets</span><strong id="kpiBets">0</strong></div>
-        <div class="card"><span>Total Stake</span><strong id="kpiStake">£0.00</strong></div>
-        <div class="card"><span>Returns</span><strong id="kpiReturns">£0.00</strong></div>
-        <div class="card"><span>Profit / Loss</span><strong id="kpiProfit">£0.00</strong></div>
-        <div class="card"><span>ROI</span><strong id="kpiRoi">0.00%</strong></div>
-        <div class="card"><span>Win Rate</span><strong id="kpiWin">0.00%</strong></div>
-        <div class="card"><span>Average Odds</span><strong id="kpiOdds">0.00</strong></div>
-        <div class="card"><span>Current Streak</span><strong id="kpiStreak">0</strong></div>
-      </div>
-
-      <div class="grid two">
-        <div class="panel">
-          <div class="panel-head"><h2>Cumulative P/L</h2></div>
-          <canvas id="plChart"></canvas>
+      <div class="dashboard-cards">
+        <div class="panel dashboard-section">
+          <div class="panel-head"><h2>Current Open Bets</h2><span class="section-count" id="openBetCount">0</span></div>
+          <div id="openBetsDash" class="bet-card-list"></div>
         </div>
-        <div class="panel">
-          <div class="panel-head"><h2>Monthly P/L</h2></div>
-          <canvas id="monthlyChart"></canvas>
-        </div>
-      </div>
-
-      <div id="installHelp" class="panel install-help">
-        <div><h2>📱 Install on your phone</h2><p>Use the <b>Install App</b> button when it appears. If your browser does not offer it yet, use your browser menu → <b>Add to Home screen</b>.</p></div>
-      </div>
-
-      <div class="grid two">
-        <div class="panel">
-          <div class="panel-head"><h2>Best Markets</h2></div>
-          <div id="marketDash"></div>
-        </div>
-        <div class="panel">
-          <div class="panel-head"><h2>Best Leagues</h2></div>
-          <div id="leagueDash"></div>
+        <div class="panel dashboard-section">
+          <div class="panel-head"><h2>Latest Results</h2><span class="section-count">Last 3</span></div>
+          <div id="recentResultsDash" class="bet-card-list"></div>
         </div>
       </div>
     </section>
@@ -136,13 +110,21 @@
             <label class="file-button secondary">Import JSON<input id="importJson" type="file" accept=".json"></label>
           </div>
         </div>
+        <div class="history-stats" id="historyStats">
+          <div class="card"><span>Total Bets</span><strong id="historyKpiBets">0</strong></div>
+          <div class="card"><span>Win Rate</span><strong id="historyKpiWin">0.00%</strong></div>
+          <div class="card"><span>Total Stake</span><strong id="historyKpiStake">£0.00</strong></div>
+          <div class="card"><span>Returns</span><strong id="historyKpiReturns">£0.00</strong></div>
+          <div class="card"><span>Profit / Loss</span><strong id="historyKpiProfit">£0.00</strong></div>
+          <div class="card"><span>ROI</span><strong id="historyKpiRoi">0.00%</strong></div>
+        </div>
         <div class="history-chart-panel">
           <div class="panel-head">
-            <div><h3>Profit & Loss</h3><p class="muted">One point per betting day. Tap a point to see that day’s P/L, cumulative P/L, stake and bets. Filters also update the graph.</p></div>
+            <div><h3>Profit & Loss</h3><p class="muted">Cumulative P/L from your settled bets. Filters below also update this graph.</p></div>
           </div>
           <div class="history-chart-wrap"><canvas id="historyPlChart"></canvas></div>
-          <div id="historyChartEmpty" class="chart-empty hidden">Add or load settled bets to see your P/L line.</div>
           <div id="historyDayDetails" class="history-day-details hidden" aria-live="polite"></div>
+          <div id="historyChartEmpty" class="chart-empty hidden">Add or load settled bets to see your P/L line.</div>
         </div>
         <div class="filters">
           <input id="search" placeholder="Search selection/event/league/market...">
