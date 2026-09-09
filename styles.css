@@ -152,3 +152,11 @@ body.view-desktop .dashboard-mini-stats .mini-stat{grid-column:auto}
 }
 
 .league-best-label{color:#fff}.league-best-pl{margin-left:3px;font-weight:900}.league-best-pl.positive{color:#61d69b}.league-best-pl.negative{color:#ff6d7d}
+
+/* v20: League Best/Worst stack and force P/L colour coding */
+.league-best-stack{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+.league-best-pl.positive{color:#61d69b!important}
+.league-best-pl.negative{color:#ff6d7d!important}
+.league-market-row>span:nth-child(3).positive{color:#61d69b!important}
+.league-market-row>span:nth-child(3).negative{color:#ff6d7d!important}
+@media(max-width:700px){.league-best-stack{width:100%;align-items:stretch}.league-best{display:block;text-align:left}}
