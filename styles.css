@@ -54,3 +54,29 @@
 
 .league-market-panel{margin-bottom:16px}.league-market-panel .panel-head{margin-bottom:12px}.league-market-list{display:grid;gap:10px}.league-market-card{padding:13px;border:1px solid #26324c;border-radius:13px;background:linear-gradient(145deg,#0e172b,#0b1324)}.league-market-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:9px}.league-market-head strong{display:block;font-size:16px}.league-market-head small{display:block;color:#7f8da8;font-size:11px;margin-top:2px}.league-best{padding:5px 8px;border-radius:999px;background:#202a43;color:#aeb9cc;font-size:11px;font-weight:800;white-space:nowrap}.league-market-rows{display:grid;gap:5px}.league-market-row{display:grid;grid-template-columns:minmax(150px,1.5fr) 1fr auto auto;gap:10px;align-items:center;padding:8px 9px;border-radius:8px;background:#101a2e;color:#7f8da8;font-size:11px}.league-market-name{color:#dfe5f0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.league-market-row .positive,.league-market-row .negative{font-weight:800;white-space:nowrap}.analytics-empty{padding:18px;text-align:center;color:#7f8da8;border:1px dashed #2a3753;border-radius:12px}
 @media(max-width:700px){.league-market-head{align-items:flex-start;flex-direction:column}.league-market-row{grid-template-columns:1fr auto}.league-market-row>span:nth-child(2){grid-column:1}.league-market-row>span:nth-child(3),.league-market-row>span:nth-child(4){grid-row:1;}.league-market-row>span:nth-child(4){grid-column:2}}
+
+/* Collapsible League × Market Analytics */
+.league-market-panel{margin-bottom:16px;padding:0;overflow:hidden}
+.league-market-summary{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:18px;cursor:pointer;user-select:none}
+.league-market-summary::-webkit-details-marker{display:none}
+.league-market-summary h2{margin:0;font-size:18px}
+.league-market-summary .muted{margin-top:4px}
+.collapse-icon{font-size:20px;color:#98a5bf;transition:transform .2s ease;flex:0 0 auto}
+.league-market-panel[open] .collapse-icon{transform:rotate(180deg)}
+.league-market-panel[open] #leagueMarketBreakdown{padding:0 18px 18px}
+@media(max-width:500px){.league-market-summary{padding:14px}.league-market-panel[open] #leagueMarketBreakdown{padding:0 13px 13px}}
+
+
+/* Final polish: colour-code League × Market rows by P/L */
+.league-market-row.market-positive{background:linear-gradient(90deg,rgba(35,140,91,.20),rgba(16,26,46,.92));border:1px solid rgba(97,214,155,.20)}
+.league-market-row.market-negative{background:linear-gradient(90deg,rgba(180,50,70,.20),rgba(16,26,46,.92));border:1px solid rgba(255,109,125,.20)}
+.league-market-row.market-neutral{background:#101a2e;border:1px solid #26324c}
+.league-market-row.market-positive .league-market-name{color:#8be7b8}
+.league-market-row.market-negative .league-market-name{color:#ff9aa7}
+
+/* Keep the 7 Dashboard stats in exactly two rows; give the final 3 cards more room on mobile. */
+@media(max-width:700px){
+  .dashboard-mini-stats{grid-template-columns:repeat(12,1fr)}
+  .dashboard-mini-stats .mini-stat{grid-column:span 3}
+  .dashboard-mini-stats .mini-stat:nth-child(n+5){grid-column:span 4}
+}

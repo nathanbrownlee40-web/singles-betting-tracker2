@@ -198,7 +198,7 @@ function renderLeagueMarketBreakdown(){
    const best=g.markets[0];
    return `<div class="league-market-card">
      <div class="league-market-head"><div><strong>${esc(g.name)}</strong><small>${g.markets.length} market${g.markets.length===1?"":"s"} tracked</small></div><span class="league-best">Best: ${esc(best.name)}</span></div>
-     <div class="league-market-rows">${g.markets.map(r=>`<div class="league-market-row">
+     <div class="league-market-rows">${g.markets.map(r=>`<div class="league-market-row ${r.pl>0?"market-positive":r.pl<0?"market-negative":"market-neutral"}>
        <span class="league-market-name">${esc(r.name)}</span>
        <span>${r.bets} bet${r.bets===1?"":"s"} · ${r.win.toFixed(0)}% win</span>
        <span class="${r.pl>=0?"positive":"negative"}">${r.pl>=0?"+":""}${money(r.pl)}</span>

@@ -156,10 +156,10 @@
         <div><span class="eyebrow">BETTING INTELLIGENCE</span><h2>Analytics</h2><p>See exactly which markets, selections, leagues and odds ranges are making or losing money.</p></div>
         <div class="analytics-hero-badge">Live from your bets</div>
       </div>
-      <div class="panel league-market-panel">
-        <div class="panel-head"><div><h2>League × Market Breakdown</h2><p class="muted">See which markets perform best inside each league, based on settled bets.</p></div></div>
+      <details class="panel league-market-panel">
+        <summary class="league-market-summary"><div><h2>League × Market Breakdown</h2><p class="muted">See which markets perform best inside each league, based on settled bets.</p></div><span class="collapse-icon">▾</span></summary>
         <div id="leagueMarketBreakdown"></div>
-      </div>
+      </details>
 
       <div class="analytics-tabs">
         <button class="analytics-tab active" data-analytics="market">Markets</button>
@@ -209,7 +209,7 @@
   <script src="app.js"></script>
 <script>
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js?v=7", { updateViaCache: "none" }).then(reg => reg.update()));
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js?v=9", { updateViaCache: "none" }).then(reg => reg.update()));
 }
 </script>
 </body>
