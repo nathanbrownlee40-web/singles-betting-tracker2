@@ -433,6 +433,20 @@ document.addEventListener("click",e=>{
 
 resetForm();setupAnalyticsTabs();render();
 
+// View mode: Auto follows the device; Mobile/Desktop let the user override the layout.
+const VIEW_MODE_KEY="singlesBettingTracker.viewMode";
+const viewMode=$("viewMode");
+function applyViewMode(mode){
+  const chosen=["auto","mobile","desktop"].includes(mode)?mode:"auto";
+  document.body.classList.toggle("view-mobile",chosen==="mobile");
+  document.body.classList.toggle("view-desktop",chosen==="desktop");
+  document.body.classList.toggle("view-auto",chosen==="auto");
+  if(viewMode)viewMode.value=chosen;
+  localStorage.setItem(VIEW_MODE_KEY,chosen);
+}
+viewMode?.addEventListener("change",()=>applyViewMode(viewMode.value));
+applyViewMode(localStorage.getItem(VIEW_MODE_KEY)||"auto");
+
 let deferredInstallPrompt=null;
 const installBtn=$("installPwa");
 function isStandalone(){return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone===true}

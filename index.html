@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.webmanifest">
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>Singles Betting Tracker</title>
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
@@ -20,6 +20,7 @@
     </div>
     <div class="top-actions">
       <button class="secondary" id="installPwa">📱 Install App</button>
+      <label class="view-mode-control"><span>View</span><select id="viewMode" aria-label="Choose app view"><option value="auto">⚙️ Auto</option><option value="mobile">📱 Mobile</option><option value="desktop">🖥️ Desktop</option></select></label>
     </div>
   </header>
 
@@ -209,7 +210,7 @@
   <script src="app.js"></script>
 <script>
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js?v=9", { updateViaCache: "none" }).then(reg => reg.update()));
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js?v=18", { updateViaCache: "none" }).then(reg => reg.update()));
 }
 </script>
 </body>
