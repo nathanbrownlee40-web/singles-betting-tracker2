@@ -51,9 +51,67 @@ function filtered(){
  }).sort((a,b)=>new Date(b.date)-new Date(a.date));
 }
 function renderHistory(){
- $("historyBody").innerHTML=filtered().map(b=>{const c=calc(b);
- return `<tr><td>${fmtDate(b.date)}</td><td><b>${esc(b.selection)}</b><br><small>${esc(b.event)}</small></td><td>${esc(b.league)}</td><td>${esc(b.market)}</td><td>${(+b.odds||0).toFixed(2)}</td><td>${money(c.stake)}</td><td class="${b.status.toLowerCase()}">${esc(b.status)}</td><td>${money(c.ret)}</td><td class="${c.pl>=0?"positive":"negative"}">${money(c.pl)}</td><td><button class="mini secondary" onclick="editBet('${b.id}')">Edit</button> <button class="mini danger" onclick="deleteBet('${b.id}')">×</button></td></tr>`}).join("")||`<tr><td colspan="10" class="muted">No bets yet. Add one or load demo data.</td></tr>`;
+ const rows=filtered();
+ if(!rows.length){
+   $("historyBody").innerHTML=`<div class="history-empty">No bets yet. Add one or load demo data.</div>`;
+   return;
+ }
+
+ const groups={};
+ rows.forEach(b=>{
+   const d=new Date(b.date);
+   const year=d.getFullYear(), month=d.getMonth();
+   const monthKey=`${year}-${String(month+1).padStart(2,"0")}`;
+   const weekStart=new Date(d); weekStart.setHours(0,0,0,0);
+   const day=(weekStart.getDay()+6)%7; weekStart.setDate(weekStart.getDate()-day);
+   const weekKey=weekStart.toISOString().slice(0,10);
+   const dayKey=String(b.date).slice(0,10);
+   if(!groups[monthKey]) groups[monthKey]={year,month,weeks:{}};
+   if(!groups[monthKey].weeks[weekKey]) groups[monthKey].weeks[weekKey]={start:weekStart,days:{}};
+   if(!groups[monthKey].weeks[weekKey].days[dayKey]) groups[monthKey].weeks[weekKey].days[dayKey]=[];
+   groups[monthKey].weeks[weekKey].days[dayKey].push(b);
+ });
+
+ const monthNames=["January","February","March","April","May","June","July","August","September","October","November","December"];
+ const fmtDay=d=>new Date(d).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"});
+ const fmtWeek=d=>`Week commencing ${new Date(d).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}`;
+
+ const betRows=arr=>arr.map(b=>{
+   const c=calc(b);
+   return `<tr><td>${fmtDate(b.date)}</td><td><b>${esc(b.selection)}</b><br><small>${esc(b.event)}</small></td><td>${esc(b.league)}</td><td>${esc(b.market)}</td><td>${(+b.odds||0).toFixed(2)}</td><td>${money(c.stake)}</td><td class="${String(b.status).toLowerCase()}">${esc(b.status)}</td><td>${money(c.ret)}</td><td class="${c.pl>=0?"positive":"negative"}">${money(c.pl)}</td><td><button class="mini secondary" onclick="editBet('${b.id}')">Edit</button> <button class="mini danger" onclick="deleteBet('${b.id}')">×</button></td></tr>`;
+ }).join("");
+
+ let out="";
+ Object.values(groups).sort((a,b)=>b.year-a.year||b.month-a.month).forEach(m=>{
+   const monthBets=Object.values(m.weeks).flatMap(w=>Object.values(w.days).flat());
+   const ms=monthBets.reduce((a,b)=>{const c=calc(b);a.st+=c.stake;a.pl+=c.pl;return a},{st:0,pl:0});
+   const monthId=`month-${m.year}-${m.month}`;
+   out+=`<tr class="history-group month-group"><td colspan="10"><button class="collapse-btn" data-target="${monthId}">▾</button><b>${monthNames[m.month]} ${m.year}</b><span class="group-summary">${monthBets.length} bets · ${money(ms.pl)} P/L</span></td></tr>`;
+   out+=`<tr id="${monthId}" class="group-content"><td colspan="10"><div class="nested-groups">`;
+   Object.values(m.weeks).sort((a,b)=>b.start-a.start).forEach(w=>{
+     const weekBets=Object.values(w.days).flat();
+     const ws=weekBets.reduce((a,b)=>{const c=calc(b);a.pl+=c.pl;return a},{pl:0});
+     const weekId=`${monthId}-week-${w.start.toISOString().slice(0,10)}`;
+     out+=`<div class="week-group"><button class="collapse-btn" data-target="${weekId}">▾</button><b>${fmtWeek(w.start)}</b><span class="group-summary">${weekBets.length} bets · ${money(ws.pl)} P/L</span></div>`;
+     out+=`<div id="${weekId}" class="group-content week-content">`;
+     Object.entries(w.days).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([dayKey,dayBets])=>{
+       const ds=dayBets.reduce((a,b)=>{const c=calc(b);a.pl+=c.pl;return a},{pl:0});
+       const dayId=`${weekId}-day-${dayKey}`;
+       out+=`<div class="day-group"><button class="collapse-btn" data-target="${dayId}">▾</button><b>${fmtDay(dayKey)}</b><span class="group-summary">${dayBets.length} bets · ${money(ds.pl)} P/L</span></div>`;
+       out+=`<div id="${dayId}" class="group-content day-content"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Selection</th><th>League</th><th>Market</th><th>Odds</th><th>Stake</th><th>Status</th><th>Returns</th><th>P/L</th><th></th></tr></thead><tbody>${betRows(dayBets)}</tbody></table></div></div>`;
+     });
+     out+=`</div>`;
+   });
+   out+=`</div></td></tr>`;
+ });
+ $("historyBody").innerHTML=out;
+ document.querySelectorAll(".collapse-btn").forEach(btn=>btn.onclick=()=>{
+   const el=$(btn.dataset.target); if(!el)return;
+   el.classList.toggle("collapsed");
+   btn.textContent=el.classList.contains("collapsed")?"▸":"▾";
+ });
 }
+
 function listHTML(rows){
  if(!rows.length)return `<p class="muted">No settled data yet.</p>`;
  return `<div class="stat-list">${rows.slice(0,6).map(x=>`<div class="stat-row"><span><b>${esc(x.name)}</b><br><small>${x.bets} bets • ${pct(x.roi)} ROI</small></span><strong class="${x.pl>=0?"positive":"negative"}">${money(x.pl)}</strong></div>`).join("")}</div>`;
@@ -76,7 +134,7 @@ function tableHTML(rows,metric){
         : (value > 0 ? "metric-good" : value < 0 ? "metric-bad" : "metric-neutral");
 
       return `<div class="performance-row">
-        <div class="performance-name" title="${escapeHTML(r.name)}">${escapeHTML(r.name)}</div>
+        <div class="performance-name" title="${esc(r.name)}">${esc(r.name)}</div>
         <div class="performance-main">
           <div class="performance-track">
             <div class="performance-fill ${cls}" style="width:${width}%"></div>
@@ -125,16 +183,21 @@ function setupAnalyticsTabs(){
  });
 }
 function renderCharts(){
- const settled=bets.filter(b=>b.status!=="Pending").sort((a,b)=>new Date(a.date)-new Date(b.date));let run=0;
+ const settled=bets.filter(b=>b.status!=="Pending").sort((a,b)=>new Date(a.date)-new Date(b.date));
+ if(typeof Chart==="undefined") return;
+ let run=0;
  const labels=settled.map(b=>fmtDate(b.date)), vals=settled.map(b=>{run+=calc(b).pl;return +run.toFixed(2)});
  draw("plChart","line",labels,vals,"Cumulative P/L");
- const months={};settled.forEach(b=>{const k=String(b.date).slice(0,7);months[k]=(months[k]||0)+calc(b).pl});
- draw("monthlyChart","bar",Object.keys(months),Object.values(months).map(x=>+x.toFixed(2)),"Monthly P/L");
+
+ const months={};
+ settled.forEach(b=>{
+   const d=new Date(b.date);
+   const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+   months[k]=(months[k]||0)+calc(b).pl;
+ });
+ draw("monthlyChart","bar",Object.keys(months).sort(),Object.keys(months).sort().map(k=>+months[k].toFixed(2)),"Monthly P/L");
 }
-function draw(id,type,labels,data,label){
- if(charts[id])charts[id].destroy();
- charts[id]=new Chart($(id),{type,data:{labels,datasets:[{label,data,tension:.3,borderWidth:2}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>"£"+v}}}}});
-}
+
 function resetForm(){
  $("betId").value="";$("formTitle").textContent="Add a bet";$("betForm").reset();
  $("date").value=new Date().toISOString().slice(0,16);
@@ -251,3 +314,25 @@ $("saveOcr").onclick=()=>{
  if(!b.selection||!b.odds||!b.stake){alert("Please fill in selection, odds and stake.");return}bets.push(b);save();showTab("dashboard");$("ocrStatus").textContent="Saved.";};
 
 resetForm();setupAnalyticsTabs();render();
+
+let deferredInstallPrompt=null;
+window.addEventListener("beforeinstallprompt",e=>{
+ e.preventDefault();
+ deferredInstallPrompt=e;
+ const btn=$("installPwa");
+ if(btn) btn.classList.remove("hidden");
+});
+window.addEventListener("appinstalled",()=>{
+ deferredInstallPrompt=null;
+ const btn=$("installPwa");
+ if(btn){btn.classList.add("hidden");btn.textContent="Installed ✓";}
+});
+
+document.addEventListener("click",async e=>{
+ if(e.target && e.target.id==="installPwa" && deferredInstallPrompt){
+   deferredInstallPrompt.prompt();
+   await deferredInstallPrompt.userChoice;
+   deferredInstallPrompt=null;
+   e.target.classList.add("hidden");
+ }
+});
