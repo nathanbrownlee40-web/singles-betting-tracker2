@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Singles Betting Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Singles Betting Tracker</h1>
+      <p>Track bets, P/L, ROI and what’s actually making you money.</p>
+    </div>
+    <div class="top-actions">
+      <button class="secondary" id="demoBtn">Load demo data</button>
+      <button class="danger" id="clearBtn">Clear all</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="dashboard">Dashboard</button>
+    <button class="tab" data-tab="add">Add Bet</button>
+    <button class="tab" data-tab="ocr">Screenshot Import</button>
+    <button class="tab" data-tab="history">Betting History</button>
+    <button class="tab" data-tab="analytics">Analytics</button>
+  </nav>
+
+  <main>
+    <section id="dashboard" class="tab-panel active">
+      <div class="kpis">
+        <div class="card"><span>Total Bets</span><strong id="kpiBets">0</strong></div>
+        <div class="card"><span>Total Stake</span><strong id="kpiStake">£0.00</strong></div>
+        <div class="card"><span>Returns</span><strong id="kpiReturns">£0.00</strong></div>
+        <div class="card"><span>Profit / Loss</span><strong id="kpiProfit">£0.00</strong></div>
+        <div class="card"><span>ROI</span><strong id="kpiRoi">0.00%</strong></div>
+        <div class="card"><span>Win Rate</span><strong id="kpiWin">0.00%</strong></div>
+        <div class="card"><span>Average Odds</span><strong id="kpiOdds">0.00</strong></div>
+        <div class="card"><span>Current Streak</span><strong id="kpiStreak">0</strong></div>
+      </div>
+
+      <div class="grid two">
+        <div class="panel">
+          <div class="panel-head"><h2>Cumulative P/L</h2></div>
+          <canvas id="plChart"></canvas>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Monthly P/L</h2></div>
+          <canvas id="monthlyChart"></canvas>
+        </div>
+      </div>
+
+      <div class="grid two">
+        <div class="panel">
+          <div class="panel-head"><h2>Best Markets</h2></div>
+          <div id="marketDash"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Best Leagues</h2></div>
+          <div id="leagueDash"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="add" class="tab-panel">
+      <div class="panel form-panel">
+        <div class="panel-head"><h2 id="formTitle">Add a bet</h2></div>
+        <form id="betForm">
+          <input type="hidden" id="betId">
+          <div class="form-grid">
+            <label>Date/time<input id="date" type="datetime-local" required></label>
+            <label>Bookmaker<input id="bookmaker" placeholder="Bet365, Sky Bet..."></label>
+            <label>Selection<input id="selection" placeholder="Team/player/selection" required></label>
+            <label>Event<input id="event" placeholder="Match or event"></label>
+            <label>League<input id="league" placeholder="Premier League"></label>
+            <label>Market<input id="market" placeholder="Match Result"></label>
+            <label>Odds<input id="odds" type="number" step="0.01" min="1" required></label>
+            <label>Stake (£)<input id="stake" type="number" step="0.01" min="0" required></label>
+            <label>Status
+              <select id="status">
+                <option>Pending</option><option>Win</option><option>Loss</option><option>Void</option>
+              </select>
+            </label>
+            <label>Returns (£)<input id="returns" type="number" step="0.01" min="0"></label>
+            <label class="wide">Notes<textarea id="notes" rows="3"></textarea></label>
+          </div>
+          <div class="form-actions">
+            <button type="submit">Save bet</button>
+            <button type="button" class="secondary" id="resetForm">Reset</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section id="ocr" class="tab-panel">
+      <div class="panel">
+        <div class="panel-head"><h2>Screenshot Import</h2></div>
+        <p class="muted">Upload a betting screenshot. OCR runs in your browser, then you can check and correct the extracted details before saving.</p>
+        <input id="screenshot" type="file" accept="image/*">
+        <div id="ocrStatus" class="ocr-status"></div>
+        <div id="ocrPreview"></div>
+        <div id="ocrFields" class="form-grid hidden">
+          <label>Date/time<input id="ocrDate" type="datetime-local"></label>
+          <label>Bookmaker<input id="ocrBookmaker"></label>
+          <label>Selection<input id="ocrSelection"></label>
+          <label>Event<input id="ocrEvent"></label>
+          <label>League<input id="ocrLeague"></label>
+          <label>Market<input id="ocrMarket"></label>
+          <label>Odds<input id="ocrOdds" type="number" step="0.01"></label>
+          <label>Stake (£)<input id="ocrStake" type="number" step="0.01"></label>
+          <label>Status<select id="ocrStatusSelect"><option>Pending</option><option>Win</option><option>Loss</option><option>Void</option></select></label>
+          <label>Returns (£)<input id="ocrReturns" type="number" step="0.01"></label>
+        </div>
+        <button id="saveOcr" class="hidden">Save extracted bet</button>
+      </div>
+    </section>
+
+    <section id="history" class="tab-panel">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Betting History</h2>
+          <div class="actions">
+            <button class="secondary" id="exportCsv">Export CSV</button>
+            <button class="secondary" id="exportJson">Export JSON</button>
+            <label class="file-button secondary">Import JSON<input id="importJson" type="file" accept=".json"></label>
+          </div>
+        </div>
+        <div class="filters">
+          <input id="search" placeholder="Search selection/event/league/market...">
+          <select id="filterStatus"><option value="">All statuses</option><option>Win</option><option>Loss</option><option>Void</option><option>Pending</option></select>
+          <input id="filterMarket" placeholder="Market">
+          <input id="filterLeague" placeholder="League">
+          <input id="filterFrom" type="date">
+          <input id="filterTo" type="date">
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Selection</th><th>League</th><th>Market</th><th>Odds</th><th>Stake</th><th>Status</th><th>Returns</th><th>P/L</th><th></th></tr></thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="analytics" class="tab-panel">
+      <div class="grid two">
+        <div class="panel"><div class="panel-head"><h2>Market Performance</h2></div><div id="marketTable"></div></div>
+        <div class="panel"><div class="panel-head"><h2>League Performance</h2></div><div id="leagueTable"></div></div>
+      </div>
+      <div class="grid two">
+        <div class="panel"><div class="panel-head"><h2>Odds Range</h2></div><div id="oddsTable"></div></div>
+        <div class="panel"><div class="panel-head"><h2>Overall Summary</h2></div><div id="summary"></div></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>Singles Betting Tracker • Data is stored locally in this browser.</footer>
+  <script src="app.js"></script>
+</body>
+</html>
