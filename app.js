@@ -657,8 +657,21 @@ applyViewMode(localStorage.getItem(VIEW_MODE_KEY)||"auto");
 let deferredInstallPrompt=null;
 const installBtn=$("installPwa");
 function isStandalone(){return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone===true}
-function updateInstallButton(){if(!installBtn)return;if(isStandalone()){installBtn.classList.add("hidden");return}installBtn.classList.remove("hidden");installBtn.textContent="📱 Install App"}
+function updateInstallButton(){if(!installBtn)return;if(isStandalone()){installBtn.classList.add("hidden");return}installBtn.classList.remove("hidden");installBtn.textContent=deferredInstallPrompt?"📱 Install App":"📱 Install App"}
 window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstallPrompt=e;updateInstallButton()});
 window.addEventListener("appinstalled",()=>{deferredInstallPrompt=null;updateInstallButton()});
-installBtn?.addEventListener("click",async()=>{if(isStandalone())return;if(deferredInstallPrompt){const prompt=deferredInstallPrompt;deferredInstallPrompt=null;try{await prompt.prompt();await prompt.userChoice}catch(err){console.warn("Install prompt unavailable:",err)}updateInstallButton();return}alert("The install prompt is not available yet. Chrome may show Install App in its normal menu once the site meets its install requirements.")});
+installBtn?.addEventListener("click",async()=>{
+  if(isStandalone())return;
+  if(deferredInstallPrompt){
+    const prompt=deferredInstallPrompt;
+    try{
+      await prompt.prompt();
+      await prompt.userChoice;
+    }catch(err){console.warn("Install prompt unavailable:",err)}
+    deferredInstallPrompt=null;
+    updateInstallButton();
+    return;
+  }
+  alert("Chrome hasn't made the in-app install prompt available yet. Try Chrome ⋮ → Install app (or Add to Home screen). If Install app is not shown yet, reload this page after a few seconds and try again.");
+});
 updateInstallButton();
