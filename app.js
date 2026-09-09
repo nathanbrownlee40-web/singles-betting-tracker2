@@ -439,60 +439,81 @@ function inferMarket(selection,text){
  if(/match result|to win|draw no bet|double chance/.test(s)) return "Match Result";
  return "";
 }
+function parseOCRBet(text){
+ const lines=text.split("\n").map(x=>x.trim()).filter(Boolean);
+ const joined=lines.join(" ");
+ let selection="", odds="";
+ for(const line of lines){
+   const m=line.match(/(?:^|[^a-z])(over|under)\s*(\d+(?:\.\d+)?)\s+(\d+\.\d{1,2})(?:\b|$)/i);
+   if(m){selection=`${m[1][0].toUpperCase()+m[1].slice(1).toLowerCase()} ${m[2]}`;odds=+m[3];break;}
+ }
+ if(!selection){
+   const m=joined.match(/\b(over|under)\s*(\d+(?:\.\d+)?)\s*(?:@\s*)?(\d+\.\d{1,2})\b/i);
+   if(m){selection=`${m[1][0].toUpperCase()+m[1].slice(1).toLowerCase()} ${m[2]}`;odds=+m[3];}
+ }
+ let market=firstMatch(text,[
+   /\b(total cards|total corners|total goals|both teams to score|double chance|draw no bet|match result|over\/under|corners)\b/i
+ ])||inferMarket(selection,text);
+ if(market) market=market.replace(/\s+(?:3[- ]?way|2[- ]?way)\b/i,"").trim();
+ let event="";
+ const marketIdx=lines.findIndex(l=>market && l.toLowerCase().includes(market.toLowerCase()));
+ if(marketIdx>=0){
+   const candidates=[];
+   for(const l of lines.slice(marketIdx+1,Math.min(lines.length,marketIdx+7))){
+     let x=l.replace(/^[^A-Za-z]+/,"").trim();
+     x=x.replace(/\s+\d{1,2}$|\s+[A-Za-z]?\d{1,2}\s*$/,"").trim();
+     if(/^[A-Za-z][A-Za-z .&'’-]{2,}$/.test(x) && !/^(stake|return|returns|share|total cards|3-way)$/i.test(x)) candidates.push(x);
+     if(candidates.length===2)break;
+   }
+   if(candidates.length===2)event=`${candidates[0]} v ${candidates[1]}`;
+ }
+ if(!event){
+   const m=joined.match(/\b([A-Za-z][A-Za-z .'-]{2,})\s+(?:v|vs|versus)\s+([A-Za-z][A-Za-z .'-]{2,})\b/i);
+   if(m)event=`${m[1].trim()} v ${m[2].trim()}`;
+ }
+ let stake="", returns="";
+ const money=[...text.matchAll(/[£$€]\s*(\d+(?:\.\d{1,2})?)/g)].map(m=>+m[1]);
+ const sr=joined.match(/stake\s+return\s+£?\s*(\d+(?:\.\d{1,2})?)\s+£?\s*(\d+(?:\.\d{1,2})?)/i);
+ if(sr){stake=+sr[1];returns=+sr[2];}
+ const sm=joined.match(/(?:stake|wager|bet amount|amount)\s*[:\-]?\s*[£$€]?\s*(\d+(?:\.\d{1,2})?)/i);
+ const rm=joined.match(/(?:return|returns|payout|potential return|possible return)\s*[:\-]?\s*[£$€]?\s*(\d+(?:\.\d{1,2})?)/i);
+ if(!stake && sm)stake=+sm[1];
+ if(!returns && rm)returns=+rm[1];
+ if(!stake && money.length)stake=money[0];
+ if(!returns && money.length>1)returns=money[money.length-1];
+ let bookmaker=firstMatch(text,[/(bet365|sky bet|ladbrokes|william hill|paddy power|coral|betfred|unibet|betfair|boylesports|888sport)/i]);
+ let league=firstMatch(text,[/(premier league|championship|league one|league two|la liga|serie a|bundesliga|ligue 1|champions league|europa league|conference league|fa cup|carabao cup|world cup|euro)/i]);
+ let status="Pending";
+ if(/\b(won|winner|settled win)\b/i.test(joined))status="Win";
+ else if(/\b(lost|loser|settled loss)\b/i.test(joined))status="Loss";
+ else if(/\b(void|voided|push)\b/i.test(joined))status="Void";
+ return {bookmaker,selection,event,league,market,odds,stake,status,returns,text};
+}
 $("screenshot").onchange=async e=>{
  const file=e.target.files[0];if(!file)return;
  $("ocrStatus").textContent="Reading screenshot…";
- $("ocrPreview").innerHTML=`<img src="${URL.createObjectURL(file)}" alt="Betting screenshot">`;
+ const previewUrl=URL.createObjectURL(file);
+ $("ocrPreview").innerHTML=`<img src="${previewUrl}" alt="Betting screenshot">`;
  $("ocrFields").classList.remove("hidden");$("saveOcr").classList.remove("hidden");
  try{
   const result=await Tesseract.recognize(file,"eng",{logger:m=>{
    if(m.status==="recognizing text")$("ocrStatus").textContent=`Reading screenshot… ${Math.round((m.progress||0)*100)}%`;
   }});
   const text=cleanOCRText(result.data.text);
-  const lower=text.toLowerCase();
-
-  const bookmaker=firstMatch(text,[/(bet365|sky bet|ladbrokes|william hill|paddy power|coral|betfred|unibet|betfair|boylesports|888sport)/i]);
-  const oddsMatches=[...text.matchAll(/(?:@|odds?\s*[:\-]?\s*|price\s*[:\-]?\s*)(\d+(?:\.\d{1,2})?)/gi)];
-  const allDecimal=[...text.matchAll(/\b(\d+\.\d{1,2})\b/g)].map(m=>+m[1]).filter(n=>n>=1.01&&n<=100);
-  const odds=oddsMatches.length?+oddsMatches[0][1]:(allDecimal.length?allDecimal[0]:"");
-
-  const stakeMatch=text.match(/(?:stake|wager|bet amount|amount)\s*[:\-]?\s*[£$€]?\s*(\d+(?:\.\d{1,2})?)/i);
-  const returnMatch=text.match(/(?:return|returns|payout|potential return|possible return|win)\s*[:\-]?\s*[£$€]?\s*(\d+(?:\.\d{1,2})?)/i);
-  const stake=stakeMatch?+stakeMatch[1]:"";
-  const returns=returnMatch?+returnMatch[1]:"";
-
-  let selection=firstMatch(text,[
-   /(?:selection|bet|pick)\s*[:\-]\s*(.+)/i,
-   /(?:total cards|cards|total corners|corners|over|under)\s+([^\n]+)/i
-  ]);
-  selection=(selection||"").replace(/\s+(?:@|odds|stake|return).*/i,"").trim();
-
-  const event=firstMatch(text,[
-   /(?:event|fixture|match)\s*[:\-]\s*(.+)/i,
-   /\b([A-Za-z][A-Za-z .'-]{2,})\s+(?:v|vs|versus)\s+([A-Za-z][A-Za-z .'-]{2,})\b/i
-  ]);
-  const eventText=event||"";
-  let league=firstMatch(text,[/(premier league|championship|league one|league two|la liga|serie a|bundesliga|ligue 1|champions league|europa league|conference league|fa cup|carabao cup|world cup|euro)/i]);
-  let market=firstMatch(text,[/(total cards|match result|both teams to score|double chance|draw no bet|total goals|over\/under|corners)/i])||inferMarket(selection,text);
-
-  let status="Pending";
-  if(/\b(won|winner|win|settled win)\b/i.test(lower))status="Win";
-  else if(/\b(lost|loser|loss|settled loss)\b/i.test(lower))status="Loss";
-  else if(/\b(void|voided|push)\b/i.test(lower))status="Void";
-
+  const parsed=parseOCRBet(text);
   $("ocrDate").value=new Date().toISOString().slice(0,16);
-  $("ocrBookmaker").value=bookmaker;
-  $("ocrSelection").value=selection;
-  $("ocrEvent").value=eventText;
-  $("ocrLeague").value=league;
-  $("ocrMarket").value=market;
-  $("ocrOdds").value=odds;
-  $("ocrStake").value=stake;
-  $("ocrStatusSelect").value=status;
-  $("ocrReturns").value=returns;
-
-  $("ocrStatus").textContent=text?"Done — fields have been filled where the screenshot text could be recognised. Check them before saving.":"No readable text was found — try a clearer screenshot.";
+  $("ocrBookmaker").value=parsed.bookmaker;
+  $("ocrSelection").value=parsed.selection;
+  $("ocrEvent").value=parsed.event;
+  $("ocrLeague").value=parsed.league;
+  $("ocrMarket").value=parsed.market;
+  $("ocrOdds").value=parsed.odds;
+  $("ocrStake").value=parsed.stake;
+  $("ocrStatusSelect").value=parsed.status;
+  $("ocrReturns").value=parsed.returns;
+  $("ocrStatus").textContent=text?"Done — fields filled from the screenshot. Check them before saving.":"No readable text was found — try a clearer screenshot.";
  }catch(err){
+  console.error(err);
   $("ocrStatus").textContent="OCR failed on this image. Try a clearer/full-resolution screenshot or enter the bet manually.";
  }
 };

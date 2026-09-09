@@ -209,3 +209,8 @@ body.view-mobile .history-month-panel[open] #monthlyHistoryBreakdown{padding:0 1
 .history-month-table tr.month-positive td:first-child{border-left:3px solid rgba(97,214,155,.75)}
 .history-month-table tr.month-negative td:first-child{border-left:3px solid rgba(255,109,125,.75)}
 .history-month-table tr.month-positive td,.history-month-table tr.month-negative td,.history-month-table tr.month-neutral td{border-bottom-color:#26324c}
+
+/* v24: keep uploaded betting screenshots compact inside the importer */
+#ocrPreview{width:100%;max-width:100%;overflow:hidden}
+#ocrPreview img{display:block;width:auto;max-width:100%;height:auto;max-height:260px;object-fit:contain;border-radius:10px;margin:10px auto}
+@media(max-width:700px){#ocrPreview img{max-height:220px}}
