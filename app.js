@@ -1,4 +1,6 @@
 const KEY="singlesBettingTracker.v1";
+let ocrMode="single";
+let ocrBatch=[];
 let bets=load();
 let charts={};
 const metricModes={market:"roi",selection:"roi",league:"roi",odds:"roi"};
@@ -412,6 +414,10 @@ function parseOCRBet(text){
    const om=nearby.match(/(?:^|\s|@)(\d+\.\d{1,2})(?=\s|$)/);
    if(om)odds=+om[1];
  }
+ if(!selection){
+   const m=joined.match(/\b([A-Za-z][A-Za-z .&'’-]{2,})\s+(?:to\s+win|win)\b/i);
+   if(m)selection=m[1].trim();
+ }
  let market=firstMatch(text,[
    /\b(total cards|total corners|total goals|both teams to score|double chance|draw no bet|match result|over\/under|corners)\b/i
  ])||inferMarket(selection,text);
@@ -420,10 +426,10 @@ function parseOCRBet(text){
  const marketIdx=lines.findIndex(l=>market && l.toLowerCase().includes(market.toLowerCase()));
  if(marketIdx>=0){
    const candidates=[];
-   for(const l of lines.slice(marketIdx+1,Math.min(lines.length,marketIdx+7))){
+   for(const l of lines.slice(marketIdx+1,Math.min(lines.length,marketIdx+8))){
      let x=l.replace(/^[^A-Za-z]+/,"").trim();
-     x=x.replace(/\s+\d{1,2}$|\s+[A-Za-z]?\d{1,2}\s*$/,"").trim();
-     if(/^[A-Za-z][A-Za-z .&'’-]{2,}$/.test(x) && !/^(stake|return|returns|share|total cards|3-way)$/i.test(x)) candidates.push(x);
+     x=x.replace(/\s+\d{1,2}$|\s+[A-Za-z]?\d{1,2}\s*$/," ").trim();
+     if(/^[A-Za-z][A-Za-z .&'’-]{2,}$/.test(x) && !/^(stake|return|returns|share|total cards|3-way|won|lost|pending|void)$/i.test(x)) candidates.push(x);
      if(candidates.length===2)break;
    }
    if(candidates.length===2)event=`${candidates[0]} v ${candidates[1]}`;
@@ -438,76 +444,94 @@ function parseOCRBet(text){
  if(sr){stake=+sr[1];returns=+sr[2];}
  const sm=joined.match(/(?:stake|wager|bet amount|amount)\s*[:\-]?\s*[£$€]?\s*(\d+(?:\.\d{1,2})?)/i);
  const rm=joined.match(/(?:return|returns|payout|potential return|possible return)\s*[:\-]?\s*[£$€]?\s*(\d+(?:\.\d{1,2})?)/i);
- if(!stake && sm)stake=+sm[1];
- if(!returns && rm)returns=+rm[1];
- if(!stake && money.length)stake=money[0];
- if(!returns && money.length>1)returns=money[money.length-1];
+ if(!stake&&sm)stake=+sm[1];
+ if(!returns&&rm)returns=+rm[1];
+ if(!stake&&money.length)stake=money[0];
+ if(!returns&&money.length>1)returns=money[money.length-1];
  let bookmaker=firstMatch(text,[/(bet365|sky bet|ladbrokes|william hill|paddy power|coral|betfred|unibet|betfair|boylesports|888sport)/i]);
  let league=firstMatch(text,[/(premier league|championship|league one|league two|la liga|serie a|bundesliga|ligue 1|champions league|europa league|conference league|fa cup|carabao cup|world cup|euro)/i]);
  let status="Pending";
  if(/\b(won|winner|settled win)\b/i.test(joined))status="Win";
  else if(/\b(lost|loser|settled loss)\b/i.test(joined))status="Loss";
  else if(/\b(void|voided|push)\b/i.test(joined))status="Void";
- return {bookmaker,selection,event,league,market,odds,stake,status,returns,text};
+ return {bookmaker,selection,event,league,market,odds,stake,status,returns,text,date:new Date().toISOString().slice(0,16)};
+}
+function makeOCRBatchFromLines(lines){
+ const clean=(lines||[]).filter(l=>l&&String(l.text||"").trim()).map(l=>({...l,text:cleanOCRText(l.text)}));
+ if(!clean.length)return [];
+ const heights=clean.map(l=>Math.max(8,(l.bbox?.y1??0)-(l.bbox?.y0??0))).sort((a,b)=>a-b);
+ const median=heights[Math.floor(heights.length/2)]||18;
+ const sorted=clean.slice().sort((a,b)=>(a.bbox?.y0||0)-(b.bbox?.y0||0));
+ const groups=[];let current=[];let lastBottom=null;
+ sorted.forEach(l=>{
+   const top=l.bbox?.y0||0,bottom=l.bbox?.y1||top+median;
+   const gap=lastBottom==null?0:top-lastBottom;
+   if(current.length && gap>Math.max(45,median*2.2)){groups.push(current);current=[];}
+   current.push(l);lastBottom=Math.max(lastBottom??0,bottom);
+ });
+ if(current.length)groups.push(current);
+ let blocks=groups.map(g=>g.map(x=>x.text).join("\n")).filter(t=>t.length>10);
+ // If a single visual block contains several repeated singles, split on common slip headers.
+ const refined=[];
+ blocks.forEach(block=>{
+   const parts=block.split(/(?=\b(?:WON|LOST|PENDING|VOID)\b\s*\n?\s*[£$€]?\s*\d+(?:\.\d{1,2})?\s+Single\b)/i).map(x=>x.trim()).filter(Boolean);
+   refined.push(...(parts.length?parts:[block]));
+ });
+ return refined.map(parseOCRBet).filter(b=>b.selection||b.odds||b.stake||b.event);
+}
+function renderOCRBatch(){
+ const el=$("ocrBatchReview");if(!el)return;
+ if(!ocrBatch.length){el.innerHTML='<div class="ocr-batch-empty">No separate bets were detected. Try a clearer screenshot or a Notes list with a blank line between bets.</div>';el.classList.remove("hidden");return;}
+ el.innerHTML=`<div class="ocr-batch-head"><div><strong>${ocrBatch.length} bet${ocrBatch.length===1?"":"s"} detected</strong><span>Check the details below, remove anything wrong, then import them all.</span></div><div class="ocr-batch-actions"><button type="button" class="secondary" id="clearOcrBatch">Clear</button><button type="button" id="importOcrBatch">Import All</button></div></div><div class="ocr-batch-list">${ocrBatch.map((b,i)=>`<div class="ocr-batch-card" data-batch-index="${i}"><div class="ocr-batch-card-head"><strong>Bet ${i+1}</strong><button type="button" class="danger mini" data-remove-ocr-bet="${i}">Remove</button></div><div class="ocr-batch-grid">
+<label>Selection<input data-batch-field="selection" value="${esc(b.selection)}"></label><label>Event<input data-batch-field="event" value="${esc(b.event)}"></label><label>League<input data-batch-field="league" value="${esc(b.league)}"></label><label>Market<input data-batch-field="market" value="${esc(b.market)}"></label><label>Odds<input data-batch-field="odds" type="number" step="0.01" value="${b.odds||""}"></label><label>Stake (£)<input data-batch-field="stake" type="number" step="0.01" value="${b.stake||""}"></label><label>Status<select data-batch-field="status"><option ${b.status==="Pending"?"selected":""}>Pending</option><option ${b.status==="Win"?"selected":""}>Win</option><option ${b.status==="Loss"?"selected":""}>Loss</option><option ${b.status==="Void"?"selected":""}>Void</option></select></label><label>Returns (£)<input data-batch-field="returns" type="number" step="0.01" value="${b.returns||""}"></label></div></div>`).join("")}</div>`;
+ el.classList.remove("hidden");
+ el.querySelectorAll("[data-batch-field]").forEach(input=>input.addEventListener("input",()=>{const card=input.closest("[data-batch-index]");const i=+card.dataset.batchIndex;const k=input.dataset.batchField;ocrBatch[i][k]=input.type==="number"?(+input.value||0):input.value;}));
+ $("importOcrBatch")?.addEventListener("click",()=>{const bad=ocrBatch.findIndex(b=>!b.selection||!+b.odds||!+b.stake);if(bad>=0){alert(`Please fill in selection, odds and stake for Bet ${bad+1}.`);return;}ocrBatch.forEach(b=>bets.push({...b,id:crypto.randomUUID(),date:b.date||new Date().toISOString().slice(0,16),notes:"Imported from multi-bet screenshot"}));save();ocrBatch=[];el.classList.add("hidden");$("ocrStatus").textContent="All detected bets imported.";});
+ $("clearOcrBatch")?.addEventListener("click",()=>{ocrBatch=[];el.classList.add("hidden");$("ocrStatus").textContent="Multiple-bet review cleared.";});
+ el.querySelectorAll("[data-remove-ocr-bet]").forEach(btn=>btn.addEventListener("click",()=>{ocrBatch.splice(+btn.dataset.removeOcrBet,1);renderOCRBatch();}));
 }
 async function prepareOCRImage(file){
  return new Promise((resolve,reject)=>{
-   const img=new Image();
-   const url=URL.createObjectURL(file);
-   img.onload=()=>{
-     URL.revokeObjectURL(url);
-     const scale=Math.min(2,2400/Math.max(img.naturalWidth,img.naturalHeight));
-     const canvas=document.createElement("canvas");
-     canvas.width=Math.round(img.naturalWidth*scale);canvas.height=Math.round(img.naturalHeight*scale);
-     const ctx=canvas.getContext("2d",{willReadFrequently:true});
-     ctx.drawImage(img,0,0,canvas.width,canvas.height);
-     const data=ctx.getImageData(0,0,canvas.width,canvas.height);
-     for(let i=0;i<data.data.length;i+=4){
-       const r=data.data[i],g=data.data[i+1],b=data.data[i+2];
-       const y=(0.299*r+0.587*g+0.114*b);
-       const boosted=Math.max(0,Math.min(255,(y-128)*1.35+128));
-       data.data[i]=data.data[i+1]=data.data[i+2]=boosted;
-     }
-     ctx.putImageData(data,0,0);
-     canvas.toBlob(blob=>blob?resolve(blob):reject(new Error("OCR image preparation failed")),"image/png");
-   };
-   img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("Could not load screenshot"))};
-   img.src=url;
+   const img=new Image();const url=URL.createObjectURL(file);
+   img.onload=()=>{URL.revokeObjectURL(url);const scale=Math.min(2,2400/Math.max(img.naturalWidth,img.naturalHeight));const canvas=document.createElement("canvas");canvas.width=Math.round(img.naturalWidth*scale);canvas.height=Math.round(img.naturalHeight*scale);const ctx=canvas.getContext("2d",{willReadFrequently:true});ctx.drawImage(img,0,0,canvas.width,canvas.height);const data=ctx.getImageData(0,0,canvas.width,canvas.height);for(let i=0;i<data.data.length;i+=4){const r=data.data[i],g=data.data[i+1],b=data.data[i+2];const y=(0.299*r+0.587*g+0.114*b);const boosted=Math.max(0,Math.min(255,(y-128)*1.35+128));data.data[i]=data.data[i+1]=data.data[i+2]=boosted;}ctx.putImageData(data,0,0);canvas.toBlob(blob=>blob?resolve(blob):reject(new Error("OCR image preparation failed")),"image/png")};
+   img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("Could not load screenshot"))};img.src=url;
  });
 }
+document.querySelectorAll("[data-ocr-mode]").forEach(btn=>btn.addEventListener("click",()=>{
+ ocrMode=btn.dataset.ocrMode==="multiple"?"multiple":"single";
+ document.querySelectorAll("[data-ocr-mode]").forEach(x=>x.classList.toggle("active",x===btn));
+ $("ocrHelp").textContent=ocrMode==="multiple"?"Upload one screenshot containing several single bets — or a screenshot of a Notes list. The app will detect separate bets, let you check them, then Import All.":"Upload a betting screenshot. OCR runs in your browser, then you can check and correct the extracted details before saving.";
+ $("ocrFields").classList.toggle("hidden",ocrMode!=="single");$("saveOcr").classList.toggle("hidden",ocrMode!=="single");$("ocrBatchReview").classList.add("hidden");
+}));
 $("screenshot").onchange=async e=>{
  const file=e.target.files[0];if(!file)return;
- $("ocrStatus").textContent="Reading screenshot…";
- const previewUrl=URL.createObjectURL(file);
- $("ocrPreview").innerHTML=`<img src="${previewUrl}" alt="Betting screenshot">`;
- $("ocrFields").classList.remove("hidden");$("saveOcr").classList.remove("hidden");
+ $("ocrStatus").textContent=ocrMode==="multiple"?"Reading multiple bets…":"Reading screenshot…";
+ const previewUrl=URL.createObjectURL(file);$("ocrPreview").innerHTML=`<img src="${previewUrl}" alt="Betting screenshot">`;
+ if(ocrMode==="multiple"){$("ocrFields").classList.add("hidden");$("saveOcr").classList.add("hidden");}else{$("ocrFields").classList.remove("hidden");$("saveOcr").classList.remove("hidden");}
  try{
   const ocrImage=await prepareOCRImage(file);
-  const result=await Tesseract.recognize(ocrImage,"eng",{logger:m=>{
-   if(m.status==="recognizing text")$("ocrStatus").textContent=`Reading screenshot… ${Math.round((m.progress||0)*100)}%`;
-  }});
+  const result=await Tesseract.recognize(ocrImage,"eng",{logger:m=>{if(m.status==="recognizing text")$("ocrStatus").textContent=`Reading screenshot… ${Math.round((m.progress||0)*100)}%`}});
   const text=cleanOCRText(result.data.text);
+  if(ocrMode==="multiple"){
+    ocrBatch=makeOCRBatchFromLines(result.data.lines||[]);
+    // Notes-style screenshots sometimes have useful line breaks but no large gaps.
+    if(ocrBatch.length<2){
+      const fallback=result.data.text.split(/\n\s*\n+/).map(x=>x.trim()).filter(Boolean).map(parseOCRBet).filter(b=>b.selection||b.odds||b.stake||b.event);
+      if(fallback.length>ocrBatch.length)ocrBatch=fallback;
+    }
+    renderOCRBatch();
+    $("ocrStatus").textContent=ocrBatch.length?`Done — detected ${ocrBatch.length} possible bets. Check them before importing.` : "No separate bets were detected — try a clearer screenshot or a Notes list with blank lines between bets.";
+    return;
+  }
   const parsed=parseOCRBet(text);
-  $("ocrDate").value=new Date().toISOString().slice(0,16);
-  $("ocrBookmaker").value=parsed.bookmaker;
-  $("ocrSelection").value=parsed.selection;
-  $("ocrEvent").value=parsed.event;
-  $("ocrLeague").value=parsed.league;
-  $("ocrMarket").value=parsed.market;
-  $("ocrOdds").value=parsed.odds;
-  $("ocrStake").value=parsed.stake;
-  $("ocrStatusSelect").value=parsed.status;
-  $("ocrReturns").value=parsed.returns;
+  $("ocrDate").value=parsed.date;$("ocrBookmaker").value=parsed.bookmaker;$("ocrSelection").value=parsed.selection;$("ocrEvent").value=parsed.event;$("ocrLeague").value=parsed.league;$("ocrMarket").value=parsed.market;$("ocrOdds").value=parsed.odds;$("ocrStake").value=parsed.stake;$("ocrStatusSelect").value=parsed.status;$("ocrReturns").value=parsed.returns;
   $("ocrStatus").textContent=text?"Done — fields filled from the screenshot. Check them before saving.":"No readable text was found — try a clearer screenshot.";
- }catch(err){
-  console.error(err);
-  $("ocrStatus").textContent="OCR failed on this image. Try a clearer/full-resolution screenshot or enter the bet manually.";
- }
+ }catch(err){console.error(err);$("ocrStatus").textContent="OCR failed on this image. Try a clearer/full-resolution screenshot or enter the bet manually.";}
 };
 $("saveOcr").onclick=()=>{
  const b={id:crypto.randomUUID(),date:$("ocrDate").value,bookmaker:$("ocrBookmaker").value,selection:$("ocrSelection").value,event:$("ocrEvent").value,league:$("ocrLeague").value,market:$("ocrMarket").value,odds:+$("ocrOdds").value,stake:+$("ocrStake").value,status:$("ocrStatusSelect").value,returns:+$("ocrReturns").value||0,notes:"Imported from screenshot"};
- if(!b.selection||!b.odds||!b.stake){alert("Please fill in selection, odds and stake.");return}bets.push(b);save();showTab("dashboard");$("ocrStatus").textContent="Saved.";};
-
+ if(!b.selection||!b.odds||!b.stake){alert("Please fill in selection, odds and stake.");return}bets.push(b);save();showTab("dashboard");$("ocrStatus").textContent="Saved.";
+};
 
 
 document.addEventListener("click",e=>{

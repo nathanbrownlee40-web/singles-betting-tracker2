@@ -234,3 +234,18 @@ body.view-mobile .history-month-panel[open] #monthlyHistoryBreakdown{padding:0 1
 #ocrPreview{width:100%;display:flex;justify-content:center;align-items:center;overflow:hidden;padding:4px 0 8px}
 #ocrPreview img{display:block;width:min(100%,560px);height:auto;max-width:100%;max-height:560px;object-fit:contain;border-radius:10px;margin:10px auto}
 @media(max-width:700px){#ocrPreview img{width:100%;max-width:100%;max-height:560px}}
+
+
+/* v27: multi-bet screenshot / Notes import */
+.ocr-mode-toggle{display:flex;gap:7px;margin:0 0 12px;padding:4px;background:#0b1324;border:1px solid #26324c;border-radius:11px;width:max-content;max-width:100%}
+.ocr-mode-toggle .ocr-mode{background:transparent;color:#8f9bb2;padding:8px 12px;font-size:12px}
+.ocr-mode-toggle .ocr-mode.active{background:#263556;color:#fff}
+.ocr-batch-review{margin-top:14px}
+.ocr-batch-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;padding:12px;border:1px solid #26324c;border-radius:12px;background:#0d1527}
+.ocr-batch-head strong{display:block;color:#eef2fa;font-size:14px}.ocr-batch-head span{display:block;color:#7f8da8;font-size:11px;margin-top:3px}
+.ocr-batch-actions{display:flex;gap:7px;flex:0 0 auto}.ocr-batch-actions button{padding:8px 11px;font-size:12px}.ocr-batch-list{display:grid;gap:9px}.ocr-batch-card{padding:12px;border:1px solid #26324c;border-radius:12px;background:linear-gradient(145deg,#101a2e,#0b1324)}
+.ocr-batch-card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}.ocr-batch-card-head strong{font-size:13px}.ocr-batch-card-head .mini{padding:6px 9px;font-size:11px}
+.ocr-batch-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.ocr-batch-grid label{display:flex;flex-direction:column;gap:5px;color:#a9b4c9;font-size:11px}.ocr-batch-grid input,.ocr-batch-grid select{width:100%;background:#0b1222;border:1px solid #2a3753;color:#eef2fa;border-radius:8px;padding:9px;outline:none;font-size:12px}
+.ocr-batch-empty{padding:14px;border:1px dashed #2a3753;border-radius:10px;color:#8f9bb2;font-size:12px;text-align:center}
+@media(max-width:800px){.ocr-batch-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:500px){.ocr-mode-toggle{width:100%}.ocr-mode-toggle .ocr-mode{flex:1}.ocr-batch-head{align-items:flex-start;flex-direction:column}.ocr-batch-actions{width:100%}.ocr-batch-actions button{flex:1}.ocr-batch-grid{grid-template-columns:1fr}}
