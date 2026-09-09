@@ -469,37 +469,74 @@ function parseNotesBetBlock(lines, inheritedDate=""){
  const clean=(lines||[]).map(x=>cleanOCRText(x)).filter(Boolean);
  if(!clean.length)return null;
  const joined=clean.join(" ");
- const eventLine=clean.find(l=>/\s[-–—]\s/.test(l) && !/@\s*\d/.test(l))||"";
- let event="";
- if(eventLine){
-   const parts=eventLine.split(/\s[-–—]\s/).map(x=>x.trim()).filter(Boolean);
-   if(parts.length>=2)event=`${parts[0]} v ${parts.slice(1).join(" - ")}`;
+ const valueAfter=(label)=>{
+   const re=new RegExp("^\\s*"+label+"\\s*[:\\-]\\s*(.+?)\\s*$","i");
+   const line=clean.find(l=>re.test(l));
+   const m=line&&line.match(re);
+   return m?m[1].trim():"";
+ };
+ const eventValue=valueAfter("event");
+ const selectionValue=valueAfter("selection");
+ const leagueValue=valueAfter("league");
+ const marketValue=valueAfter("market");
+ const bookmakerValue=valueAfter("bookmaker");
+ const oddsValue=valueAfter("odds");
+ const stakeValue=valueAfter("stake");
+ const returnsValue=valueAfter("returns?|return|payout");
+ const statusValue=valueAfter("status");
+ const timeValue=valueAfter("time|kick[- ]?off");
+ const dateValue=valueAfter("date|date/time");
+
+ let event=eventValue;
+ if(!event){
+   const eventLine=clean.find(l=>/^\s*[^:]+\s[-–—]\s[^:]+\s*$/.test(l) && !/@\s*\d/.test(l));
+   if(eventLine){
+     const parts=eventLine.split(/\s[-–—]\s/).map(x=>x.trim()).filter(Boolean);
+     if(parts.length>=2)event=`${parts[0]} v ${parts.slice(1).join(" - ")}`;
+   }
  }
- let selection="",odds="";
- const betLine=clean.find(l=>/@\s*\d+(?:\.\d{1,2})?\b/.test(l));
- if(betLine){
-   const m=betLine.match(/^(.+?)\s*@\s*(\d+(?:\.\d{1,2})?)\b/i);
-   if(m){
-     selection=m[1].replace(/[✓✔☑️❌✕✖]+/g," ").trim();
-     odds=+m[2];
+ if(event)event=event.replace(/\s[-–—]\s/g," v ").replace(/\s+v\s+v\s+/i," v ").trim();
+
+ let selection=selectionValue, odds=oddsValue?parseFloat(oddsValue.replace(/[^0-9.]/g,"")):0;
+ if(!selection){
+   const betLine=clean.find(l=>/@\s*\d+(?:\.\d{1,2})?\b/.test(l));
+   if(betLine){
+     const m=betLine.match(/^(.+?)\s*@\s*(\d+(?:\.\d{1,2})?)\b/i);
+     if(m){selection=m[1].replace(/[✓✔☑️❌✕✖]+/g," ").trim();odds=+m[2];}
    }
  }
  if(!selection){
    const m=joined.match(/\b(over|under)\s+(\d+(?:\.\d+)?)\b/i);
    if(m)selection=`${m[1][0].toUpperCase()+m[1].slice(1).toLowerCase()} ${m[2]}`;
  }
- let bookmaker=firstMatch(joined,[/(bet365|sky bet|ladbrokes|william hill|paddy power|coral|betfred|unibet|betfair|boylesports|888sport|skybet)/i]);
- if(bookmaker&&/^skybet$/i.test(bookmaker))bookmaker="Sky Bet";
- let market=firstMatch(joined,[/\b(total cards|total corners|total goals|both teams to score|double chance|draw no bet|match result|over\/under|corners)\b/i])||inferMarket(selection,joined);
+
+ let market=marketValue;
+ if(!market)market=firstMatch(joined,[/\b(total cards|total corners|total goals|both teams to score|double chance|draw no bet|match result|superboost|over\/under|corners)\b/i])||inferMarket(selection,joined);
  if(market)market=market.replace(/\s+(?:3[- ]?way|2[- ]?way)\b/i,"").trim();
- let status="Pending";
- if(/\b(won|winner|settled win)\b/i.test(joined))status="Win";
- else if(/\b(lost|loser|settled loss)\b/i.test(joined))status="Loss";
- else if(/\b(void|voided|push)\b/i.test(joined))status="Void";
- let date=clean.map(parseOCRDateLine).find(Boolean)||inheritedDate||new Date().toISOString().slice(0,16);
- const tm=joined.match(/\b(\d{1,2}):(\d{2})\s*(am|pm)?\b/i);
+
+ let league=leagueValue||firstMatch(joined,[/(premier league|championship|league one|league two|la liga|serie a|bundesliga|ligue 1|champions league|europa league|conference league|fa cup|carabao cup|world cup|euro)/i]);
+ let bookmaker=bookmakerValue||firstMatch(joined,[/(bet365|sky bet|ladbrokes|william hill|paddy power|coral|betfred|unibet|betfair|boylesports|888sport|skybet)/i]);
+ if(bookmaker&&/^skybet$/i.test(bookmaker))bookmaker="Sky Bet";
+
+ let status=(statusValue||"").trim();
+ if(!/^(Pending|Win|Loss|Void)$/i.test(status))status="";
+ if(!status){if(/\b(won|winner|settled win)\b/i.test(joined))status="Win";else if(/\b(lost|loser|settled loss)\b/i.test(joined))status="Loss";else if(/\b(void|voided|push)\b/i.test(joined))status="Void";else status="Pending";}
+ status=status.charAt(0).toUpperCase()+status.slice(1).toLowerCase();
+
+ let stake=stakeValue?parseFloat(stakeValue.replace(/[^0-9.]/g,"")):0;
+ let returns=returnsValue?parseFloat(returnsValue.replace(/[^0-9.]/g,"")):0;
+ if(!stake){const m=joined.match(/(?:stake|wager|bet amount|amount)\s*[:\-]?\s*[£$€]?\s*(\d+(?:\.\d{1,2})?)/i);if(m)stake=+m[1];}
+ if(!returns){const m=joined.match(/(?:return|returns|payout|potential return|possible return)\s*[:\-]?\s*[£$€]?\s*(\d+(?:\.\d{1,2})?)/i);if(m)returns=+m[1];}
+
+ let date=inheritedDate||new Date().toISOString().slice(0,16);
+ if(dateValue){
+   const dm=dateValue.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+   if(dm)date=`${dm[3]}-${String(+dm[2]).padStart(2,"0")}-${String(+dm[1]).padStart(2,"0")}T00:00`;
+   else {const parsed=parseOCRDateLine(dateValue);if(parsed)date=parsed;}
+ }
+ const tm=(timeValue||joined).match(/\b(\d{1,2}):(\d{2})\s*(am|pm)?\b/i);
  if(tm){let hh=+tm[1],mm=tm[2];const ap=(tm[3]||"").toLowerCase();if(ap==="pm"&&hh<12)hh+=12;if(ap==="am"&&hh===12)hh=0;if(/^\d{4}-\d{2}-\d{2}T00:00$/.test(date))date=date.slice(0,11)+String(hh).padStart(2,"0")+":"+mm;}
- return {bookmaker,selection,event,league:firstMatch(joined,[/(premier league|championship|league one|league two|la liga|serie a|bundesliga|ligue 1|champions league|europa league|conference league|fa cup|carabao cup|world cup|euro)/i]),market,odds,stake:"",status,returns:0,date,text:joined};
+ return {bookmaker,selection,event,league,market,odds,stake,status,returns,date,text:joined};
 }
 function makeOCRBatchFromLines(lines, rawText=""){
  const clean=(lines||[]).filter(l=>l&&String(l.text||"").trim()).map(l=>({...l,text:cleanOCRText(l.text)}));
