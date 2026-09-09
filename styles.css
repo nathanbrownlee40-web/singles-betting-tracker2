@@ -31,3 +31,5 @@
 .week-content,.day-content{padding:0 0 8px 18px}
 .day-group{border-top:1px solid var(--border,#e5e7eb)}
 .history-empty{padding:20px;text-align:center;color:var(--muted,#6b7280)}
+
+.install-help{margin:16px 0}.install-help h2{margin:0 0 6px}.install-help p{margin:0;color:var(--muted,#6b7280)}

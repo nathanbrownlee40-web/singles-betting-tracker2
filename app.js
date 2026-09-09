@@ -1,6 +1,7 @@
 const KEY="singlesBettingTracker.v1";
 let bets=load();
 let charts={};
+const metricModes={market:"roi",selection:"roi",league:"roi",odds:"roi"};
 
 const $=id=>document.getElementById(id);
 const money=n=>`£${Number(n||0).toFixed(2)}`;
@@ -19,7 +20,7 @@ function calc(b){
   return {stake,ret,pl};
 }
 function fmtDate(v){if(!v)return "";const d=new Date(v);return isNaN(d)?v:d.toLocaleDateString("en-GB")}
-function validBets(){return bets.filter(b=>b.status!=="Pending")}
+function validBets(){return bets.filter(b=>["Win","Loss","Void"].includes(b.status))}
 function aggregate(field){
  const m={};
  validBets().forEach(b=>{const k=(b[field]||"Unknown").trim()||"Unknown";if(!m[k])m[k]={name:k,bets:0,stake:0,ret:0,pl:0,wins:0};
@@ -183,19 +184,33 @@ function setupAnalyticsTabs(){
  });
 }
 function renderCharts(){
- const settled=bets.filter(b=>b.status!=="Pending").sort((a,b)=>new Date(a.date)-new Date(b.date));
- if(typeof Chart==="undefined") return;
- let run=0;
- const labels=settled.map(b=>fmtDate(b.date)), vals=settled.map(b=>{run+=calc(b).pl;return +run.toFixed(2)});
- draw("plChart","line",labels,vals,"Cumulative P/L");
+ try{
+  if(typeof Chart==="undefined") return;
+  const settled=validBets().slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+  let run=0;
+  const labels=settled.map(b=>fmtDate(b.date));
+  const vals=settled.map(b=>{run+=calc(b).pl;return +run.toFixed(2)});
+  draw("plChart","line",labels,vals,"Cumulative P/L");
 
- const months={};
- settled.forEach(b=>{
-   const d=new Date(b.date);
-   const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-   months[k]=(months[k]||0)+calc(b).pl;
- });
- draw("monthlyChart","bar",Object.keys(months).sort(),Object.keys(months).sort().map(k=>+months[k].toFixed(2)),"Monthly P/L");
+  const months={};
+  settled.forEach(b=>{
+    const d=new Date(b.date);
+    const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+    months[k]=(months[k]||0)+calc(b).pl;
+  });
+  const keys=Object.keys(months).sort();
+  draw("monthlyChart","bar",keys,keys.map(k=>+months[k].toFixed(2)),"Monthly P/L");
+ }catch(err){console.warn("Chart render skipped:",err)}
+}
+function draw(id,type,labels,data,label){
+ try{
+  const el=$(id);
+  if(!el || typeof Chart==="undefined") return;
+  if(charts[id]) charts[id].destroy();
+  charts[id]=new Chart(el,{type,data:{labels,datasets:[{label,data,tension:.3,borderWidth:2}]},
+   options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false}},
+   scales:{y:{ticks:{callback:v=>"£"+v}}}}});
+ }catch(err){console.warn("Chart error:",err)}
 }
 
 function resetForm(){
@@ -210,19 +225,33 @@ function editBet(id){
 function deleteBet(id){if(confirm("Delete this bet?")){bets=bets.filter(b=>b.id!==id);save()}}
 function showTab(id){document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.tab===id));document.querySelectorAll(".tab-panel").forEach(x=>x.classList.toggle("active",x.id===id))}
 function demo(){
- const now=Date.now(), samples=[
- ["Arsenal","Premier League","Match Result",2.1,25,"Win",52.5],
- ["Liverpool","Premier League","Over 2.5 Goals",1.85,20,"Loss",0],
- ["Real Madrid","La Liga","Match Result",1.65,30,"Win",49.5],
- ["Barcelona","La Liga","Both Teams To Score",1.8,15,"Win",27],
- ["Man City","Premier League","Match Result",1.45,25,"Loss",0],
- ["Dortmund","Bundesliga","Over 2.5 Goals",2.2,20,"Win",44],
- ["Inter","Serie A","Match Result",1.7,20,"Win",34],
- ["Chelsea","Premier League","Draw No Bet",1.9,15,"Loss",0],
- ["PSG","Ligue 1","Match Result",1.55,25,"Win",38.75],
- ["Napoli","Serie A","Over 2.5 Goals",2.05,20,"Loss",0]
+ const samples=[
+  ["Arsenal","Premier League","Match Result",2.10,25,"Win",52.50],
+  ["Liverpool","Premier League","Over 2.5 Goals",1.85,20,"Loss",0],
+  ["Real Madrid","La Liga","Match Result",1.65,30,"Win",49.50],
+  ["Barcelona","La Liga","Both Teams To Score",1.80,15,"Win",27],
+  ["Man City","Premier League","Match Result",1.45,25,"Loss",0],
+  ["Dortmund","Bundesliga","Over 2.5 Goals",2.20,20,"Win",44],
+  ["Inter","Serie A","Match Result",1.70,20,"Win",34],
+  ["Chelsea","Premier League","Draw No Bet",1.90,15,"Loss",0],
+  ["PSG","Ligue 1","Match Result",1.55,25,"Win",38.75],
+  ["Napoli","Serie A","Over 2.5 Goals",2.05,20,"Loss",0],
+  ["Everton","Premier League","Total Cards",2.00,10,"Win",20],
+  ["Milan","Serie A","Total Cards",2.40,12.50,"Loss",0],
+  ["Atletico","La Liga","Corners",1.95,18,"Win",35.10],
+  ["Leverkusen","Bundesliga","Match Result",1.75,22,"Win",38.50],
+  ["PSV","Eredivisie","Over 2.5 Goals",1.90,16,"Loss",0]
  ];
- bets=samples.map((x,i)=>({id:crypto.randomUUID(),date:new Date(now-(samples.length-i)*86400000*3).toISOString().slice(0,16),bookmaker:"Demo",selection:x[0],event:x[0]+" v Opponent",league:x[1],market:x[2],odds:x[3],stake:x[4],status:x[5],returns:x[6],notes:"Demo bet"}));save();
+ const start=new Date();
+ start.setDate(1); start.setHours(19,0,0,0);
+ bets=samples.map((x,i)=>{
+   const d=new Date(start);
+   d.setDate(1+i*4);
+   if(d.getMonth()!==start.getMonth()) d.setMonth(start.getMonth()-1);
+   return {id:crypto.randomUUID(),date:d.toISOString().slice(0,16),bookmaker:"Demo",selection:x[0],event:x[0]+" v Opponent",league:x[1],market:x[2],odds:x[3],stake:x[4],status:x[5],returns:x[6],notes:"Demo bet"};
+ });
+ save();
+ showTab("dashboard");
 }
 $("betForm").addEventListener("submit",e=>{e.preventDefault();const id=$("betId").value;const b={id:id||crypto.randomUUID(),date:$("date").value,bookmaker:$("bookmaker").value,selection:$("selection").value,event:$("event").value,league:$("league").value,market:$("market").value,odds:+$("odds").value,stake:+$("stake").value,status:$("status").value,returns:+$("returns").value||0,notes:$("notes").value};if(id){const i=bets.findIndex(x=>x.id===id);bets[i]=b}else bets.push(b);save();resetForm();showTab("dashboard")});
 $("resetForm").onclick=resetForm;
