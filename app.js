@@ -456,34 +456,94 @@ function parseOCRBet(text){
  else if(/\b(void|voided|push)\b/i.test(joined))status="Void";
  return {bookmaker,selection,event,league,market,odds,stake,status,returns,text,date:new Date().toISOString().slice(0,16)};
 }
-function makeOCRBatchFromLines(lines){
+function parseOCRDateLine(text){
+ const m=String(text||"").match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\b/i);
+ if(!m)return "";
+ const months={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+ const month=months[m[2].slice(0,3).toLowerCase()];
+ if(month==null)return "";
+ const now=new Date(), year=now.getFullYear();
+ return `${year}-${String(month+1).padStart(2,"0")}-${String(+m[1]).padStart(2,"0")}T00:00`;
+}
+function parseNotesBetBlock(lines, inheritedDate=""){
+ const clean=(lines||[]).map(x=>cleanOCRText(x)).filter(Boolean);
+ if(!clean.length)return null;
+ const joined=clean.join(" ");
+ const eventLine=clean.find(l=>/\s[-–—]\s/.test(l) && !/@\s*\d/.test(l))||"";
+ let event="";
+ if(eventLine){
+   const parts=eventLine.split(/\s[-–—]\s/).map(x=>x.trim()).filter(Boolean);
+   if(parts.length>=2)event=`${parts[0]} v ${parts.slice(1).join(" - ")}`;
+ }
+ let selection="",odds="";
+ const betLine=clean.find(l=>/@\s*\d+(?:\.\d{1,2})?\b/.test(l));
+ if(betLine){
+   const m=betLine.match(/^(.+?)\s*@\s*(\d+(?:\.\d{1,2})?)\b/i);
+   if(m){
+     selection=m[1].replace(/[✓✔☑️❌✕✖]+/g," ").trim();
+     odds=+m[2];
+   }
+ }
+ if(!selection){
+   const m=joined.match(/\b(over|under)\s+(\d+(?:\.\d+)?)\b/i);
+   if(m)selection=`${m[1][0].toUpperCase()+m[1].slice(1).toLowerCase()} ${m[2]}`;
+ }
+ let bookmaker=firstMatch(joined,[/(bet365|sky bet|ladbrokes|william hill|paddy power|coral|betfred|unibet|betfair|boylesports|888sport|skybet)/i]);
+ if(bookmaker&&/^skybet$/i.test(bookmaker))bookmaker="Sky Bet";
+ let market=firstMatch(joined,[/\b(total cards|total corners|total goals|both teams to score|double chance|draw no bet|match result|over\/under|corners)\b/i])||inferMarket(selection,joined);
+ if(market)market=market.replace(/\s+(?:3[- ]?way|2[- ]?way)\b/i,"").trim();
+ let status="Pending";
+ if(/\b(won|winner|settled win)\b/i.test(joined))status="Win";
+ else if(/\b(lost|loser|settled loss)\b/i.test(joined))status="Loss";
+ else if(/\b(void|voided|push)\b/i.test(joined))status="Void";
+ let date=clean.map(parseOCRDateLine).find(Boolean)||inheritedDate||new Date().toISOString().slice(0,16);
+ const tm=joined.match(/\b(\d{1,2}):(\d{2})\s*(am|pm)?\b/i);
+ if(tm){let hh=+tm[1],mm=tm[2];const ap=(tm[3]||"").toLowerCase();if(ap==="pm"&&hh<12)hh+=12;if(ap==="am"&&hh===12)hh=0;if(/^\d{4}-\d{2}-\d{2}T00:00$/.test(date))date=date.slice(0,11)+String(hh).padStart(2,"0")+":"+mm;}
+ return {bookmaker,selection,event,league:firstMatch(joined,[/(premier league|championship|league one|league two|la liga|serie a|bundesliga|ligue 1|champions league|europa league|conference league|fa cup|carabao cup|world cup|euro)/i]),market,odds,stake:"",status,returns:0,date,text:joined};
+}
+function makeOCRBatchFromLines(lines, rawText=""){
  const clean=(lines||[]).filter(l=>l&&String(l.text||"").trim()).map(l=>({...l,text:cleanOCRText(l.text)}));
  if(!clean.length)return [];
+ const texts=clean.slice().sort((a,b)=>(a.bbox?.y0||0)-(b.bbox?.y0||0)).map(l=>l.text);
+ const date= texts.map(parseOCRDateLine).find(Boolean)||new Date().toISOString().slice(0,16);
+ // Notes-style lists are easiest to split by each event line. This also handles
+ // several bets on one screenshot without relying on large vertical gaps.
+ const eventStart=/^[A-Za-z][A-Za-z0-9.'’&()/-]{1,}(?:\s+[A-Za-z0-9.'’&()/-]+){0,8}\s[-–—]\s[A-Za-z][A-Za-z0-9.'’&()/-]{1,}(?:\s+[A-Za-z0-9.'’&()/-]+){0,8}$/;
+ const starts=[];
+ texts.forEach((t,i)=>{if(eventStart.test(t.trim()))starts.push(i)});
+ if(starts.length>=2){
+   const out=[];
+   starts.forEach((st,n)=>{
+     const block=texts.slice(st,starts[n+1]??texts.length);
+     const b=parseNotesBetBlock(block,date);
+     if(b&&(b.event||b.selection||b.odds))out.push(b);
+   });
+   return out;
+ }
+ // Fallback for genuine betting slips: use OCR line positions and repeated headers.
  const heights=clean.map(l=>Math.max(8,(l.bbox?.y1??0)-(l.bbox?.y0??0))).sort((a,b)=>a-b);
  const median=heights[Math.floor(heights.length/2)]||18;
  const sorted=clean.slice().sort((a,b)=>(a.bbox?.y0||0)-(b.bbox?.y0||0));
  const groups=[];let current=[];let lastBottom=null;
  sorted.forEach(l=>{
-   const top=l.bbox?.y0||0,bottom=l.bbox?.y1||top+median;
-   const gap=lastBottom==null?0:top-lastBottom;
-   if(current.length && gap>Math.max(45,median*2.2)){groups.push(current);current=[];}
+   const top=l.bbox?.y0||0,bottom=l.bbox?.y1||top+median,gap=lastBottom==null?0:top-lastBottom;
+   if(current.length&&gap>Math.max(45,median*2.2)){groups.push(current);current=[];}
    current.push(l);lastBottom=Math.max(lastBottom??0,bottom);
  });
  if(current.length)groups.push(current);
- let blocks=groups.map(g=>g.map(x=>x.text).join("\n")).filter(t=>t.length>10);
- // If a single visual block contains several repeated singles, split on common slip headers.
+ const blocks=groups.map(g=>g.map(x=>x.text).join("\n")).filter(t=>t.length>10);
  const refined=[];
  blocks.forEach(block=>{
    const parts=block.split(/(?=\b(?:WON|LOST|PENDING|VOID)\b\s*\n?\s*[£$€]?\s*\d+(?:\.\d{1,2})?\s+Single\b)/i).map(x=>x.trim()).filter(Boolean);
    refined.push(...(parts.length?parts:[block]));
  });
- return refined.map(parseOCRBet).filter(b=>b.selection||b.odds||b.stake||b.event);
+ return refined.map(x=>parseNotesBetBlock(x.split("\n"),date)||parseOCRBet(x)).filter(b=>b&&(b.selection||b.odds||b.stake||b.event));
 }
 function renderOCRBatch(){
  const el=$("ocrBatchReview");if(!el)return;
  if(!ocrBatch.length){el.innerHTML='<div class="ocr-batch-empty">No separate bets were detected. Try a clearer screenshot or a Notes list with a blank line between bets.</div>';el.classList.remove("hidden");return;}
- el.innerHTML=`<div class="ocr-batch-head"><div><strong>${ocrBatch.length} bet${ocrBatch.length===1?"":"s"} detected</strong><span>Check the details below, remove anything wrong, then import them all.</span></div><div class="ocr-batch-actions"><button type="button" class="secondary" id="clearOcrBatch">Clear</button><button type="button" id="importOcrBatch">Import All</button></div></div><div class="ocr-batch-list">${ocrBatch.map((b,i)=>`<div class="ocr-batch-card" data-batch-index="${i}"><div class="ocr-batch-card-head"><strong>Bet ${i+1}</strong><button type="button" class="danger mini" data-remove-ocr-bet="${i}">Remove</button></div><div class="ocr-batch-grid">
-<label>Selection<input data-batch-field="selection" value="${esc(b.selection)}"></label><label>Event<input data-batch-field="event" value="${esc(b.event)}"></label><label>League<input data-batch-field="league" value="${esc(b.league)}"></label><label>Market<input data-batch-field="market" value="${esc(b.market)}"></label><label>Odds<input data-batch-field="odds" type="number" step="0.01" value="${b.odds||""}"></label><label>Stake (£)<input data-batch-field="stake" type="number" step="0.01" value="${b.stake||""}"></label><label>Status<select data-batch-field="status"><option ${b.status==="Pending"?"selected":""}>Pending</option><option ${b.status==="Win"?"selected":""}>Win</option><option ${b.status==="Loss"?"selected":""}>Loss</option><option ${b.status==="Void"?"selected":""}>Void</option></select></label><label>Returns (£)<input data-batch-field="returns" type="number" step="0.01" value="${b.returns||""}"></label></div></div>`).join("")}</div>`;
+ el.innerHTML=`<div class="ocr-batch-head"><div><strong>${ocrBatch.length} bet${ocrBatch.length===1?"":"s"} detected</strong><span>Each card is a separate bet. Check the details, remove anything wrong, then import them all.</span></div><div class="ocr-batch-actions"><button type="button" class="secondary" id="clearOcrBatch">Clear</button><button type="button" id="importOcrBatch">Import All</button></div></div><div class="ocr-batch-list">${ocrBatch.map((b,i)=>`<div class="ocr-batch-card" data-batch-index="${i}"><div class="ocr-batch-card-head"><strong>Bet ${i+1}</strong><button type="button" class="danger mini" data-remove-ocr-bet="${i}">Remove</button></div><div class="ocr-batch-grid">
+<label>Date/time<input data-batch-field="date" type="datetime-local" value="${esc(b.date||"")}"></label><label>Bookmaker<input data-batch-field="bookmaker" value="${esc(b.bookmaker||"")}"></label><label>Selection<input data-batch-field="selection" value="${esc(b.selection||"")}"></label><label>Event<input data-batch-field="event" value="${esc(b.event||"")}"></label><label>League<input data-batch-field="league" value="${esc(b.league||"")}"></label><label>Market<input data-batch-field="market" value="${esc(b.market||"")}"></label><label>Odds<input data-batch-field="odds" type="number" step="0.01" value="${b.odds||""}"></label><label>Stake (£)<input data-batch-field="stake" type="number" step="0.01" value="${b.stake||""}"></label><label>Status<select data-batch-field="status"><option ${b.status==="Pending"?"selected":""}>Pending</option><option ${b.status==="Win"?"selected":""}>Win</option><option ${b.status==="Loss"?"selected":""}>Loss</option><option ${b.status==="Void"?"selected":""}>Void</option></select></label><label>Returns (£)<input data-batch-field="returns" type="number" step="0.01" value="${b.returns||""}"></label></div></div>`).join("")}</div>`;
  el.classList.remove("hidden");
  el.querySelectorAll("[data-batch-field]").forEach(input=>input.addEventListener("input",()=>{const card=input.closest("[data-batch-index]");const i=+card.dataset.batchIndex;const k=input.dataset.batchField;ocrBatch[i][k]=input.type==="number"?(+input.value||0):input.value;}));
  $("importOcrBatch")?.addEventListener("click",()=>{const bad=ocrBatch.findIndex(b=>!b.selection||!+b.odds||!+b.stake);if(bad>=0){alert(`Please fill in selection, odds and stake for Bet ${bad+1}.`);return;}ocrBatch.forEach(b=>bets.push({...b,id:crypto.randomUUID(),date:b.date||new Date().toISOString().slice(0,16),notes:"Imported from multi-bet screenshot"}));save();ocrBatch=[];el.classList.add("hidden");$("ocrStatus").textContent="All detected bets imported.";});
@@ -513,7 +573,7 @@ $("screenshot").onchange=async e=>{
   const result=await Tesseract.recognize(ocrImage,"eng",{logger:m=>{if(m.status==="recognizing text")$("ocrStatus").textContent=`Reading screenshot… ${Math.round((m.progress||0)*100)}%`}});
   const text=cleanOCRText(result.data.text);
   if(ocrMode==="multiple"){
-    ocrBatch=makeOCRBatchFromLines(result.data.lines||[]);
+    ocrBatch=makeOCRBatchFromLines(result.data.lines||[],result.data.text||"");
     // Notes-style screenshots sometimes have useful line breaks but no large gaps.
     if(ocrBatch.length<2){
       const fallback=result.data.text.split(/\n\s*\n+/).map(x=>x.trim()).filter(Boolean).map(parseOCRBet).filter(b=>b.selection||b.odds||b.stake||b.event);
